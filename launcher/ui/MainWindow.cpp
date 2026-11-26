@@ -964,14 +964,14 @@ void MainWindow::processURLs(QList<QUrl> urls)
             const bool isExternalURLImport = (url.host().toLower() == "import") || (url.path().startsWith("/import", Qt::CaseInsensitive));
 
             QUrl dl_url;
-            if (url.scheme() == "curseforge" || (url.scheme() == BuildConfig.LAUNCHER_APP_BINARY_NAME && url.host() == "install")) {
+            if (url.scheme() == "curseforge" || (url.scheme() == BuildConfig.LAUNCHER_URLSCHEME && url.host() == "install")) {
                 // need to find the download link for the modpack / resource
                 // format of url curseforge://install?addonId=IDHERE&fileId=IDHERE
                 // format of url binaryname://install?platform=curseforge&addonId=IDHERE&fileId=IDHERE
                 QUrlQuery query(url);
 
                 // check if this is a binaryname:// url
-                if (url.scheme() == BuildConfig.LAUNCHER_APP_BINARY_NAME) {
+                if (url.scheme() == BuildConfig.LAUNCHER_URLSCHEME) {
                     // check this is an curseforge platform request
                     if (query.queryItemValue("platform").toLower() != "curseforge") {
                         qDebug() << "Invalid mod distribution platform:" << query.queryItemValue("platform");
@@ -1031,7 +1031,7 @@ void MainWindow::processURLs(QList<QUrl> urls)
                     dlUrlDialod.execWithTask(job.get());
                 }
 
-            } else if (url.scheme() == BuildConfig.LAUNCHER_APP_BINARY_NAME && !isExternalURLImport) {
+            } else if (url.scheme() == BuildConfig.LAUNCHER_URLSCHEME && !isExternalURLImport) {
                 QVariantMap receivedData;
                 const QUrlQuery query(url.query());
                 const auto items = query.queryItems();
@@ -1039,7 +1039,7 @@ void MainWindow::processURLs(QList<QUrl> urls)
                     receivedData.insert(it->first, it->second);
                 emit APPLICATION->oauthReplyRecieved(receivedData);
                 continue;
-            } else if ((url.scheme() == "prismlauncher" || url.scheme() == BuildConfig.LAUNCHER_APP_BINARY_NAME) && isExternalURLImport) {
+            } else if ((url.scheme() == "prismlauncher" || url.scheme() == BuildConfig.LAUNCHER_URLSCHEME) && isExternalURLImport) {
                 // PrismLauncher URL protocol modpack import
                 // works for any prism fork
                 // preferred import format: prismlauncher://import?url=ENCODED

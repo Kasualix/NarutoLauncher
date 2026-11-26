@@ -1465,7 +1465,7 @@ void Application::messageReceived(const QByteArray& message)
         bool isLoginAtempt = false;
         if (command == "import") {
             QString url = received.args["url"];
-            isLoginAtempt = !url.isEmpty() && normalizeImportUrl(url).scheme() == BuildConfig.LAUNCHER_APP_BINARY_NAME;
+            isLoginAtempt = !url.isEmpty() && normalizeImportUrl(url).scheme() == BuildConfig.LAUNCHER_URLSCHEME;
         }
         if (!isLoginAtempt) {
             qDebug() << "Received message" << message << "while still initializing. It will be ignored.";

@@ -398,9 +398,9 @@ Section "@Launcher_DisplayName@"
   WriteRegStr HKCU Software\Classes\modrinth "URL Protocol" ""
   WriteRegStr HKCU Software\Classes\modrinth\shell\open\command "" '"$INSTDIR\@Launcher_APP_BINARY_NAME@.exe" "%1"'
 
-  ; Write the URL Handler into registry for prismlauncher
-  WriteRegStr HKCU Software\Classes\@Launcher_APP_BINARY_NAME@ "URL Protocol" ""
-  WriteRegStr HKCU Software\Classes\@Launcher_APP_BINARY_NAME@\shell\open\command "" '"$INSTDIR\@Launcher_APP_BINARY_NAME@.exe" "%1"'
+  ; Write the URL Handler into registry for narutolauncher
+  WriteRegStr HKCU Software\Classes\@Launcher_URLScheme@ "URL Protocol" ""
+  WriteRegStr HKCU Software\Classes\@Launcher_URLScheme@\shell\open\command "" '"$INSTDIR\@Launcher_APP_BINARY_NAME@.exe" "%1"'
 
   ; Write the URL Handler into registry for prismlauncher import
   WriteRegStr HKCU Software\Classes\prismlauncher "URL Protocol" ""

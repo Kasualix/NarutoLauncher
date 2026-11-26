@@ -53,6 +53,7 @@ class Config {
     QString LAUNCHER_CONFIGFILE;
     QString LAUNCHER_GIT;
     QString LAUNCHER_APPID;
+    QString LAUNCHER_URLSCHEME;
     QString LAUNCHER_SVGFILENAME;
     QString LAUNCHER_ENVNAME;
 

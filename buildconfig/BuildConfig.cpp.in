@@ -49,6 +49,7 @@ Config::Config()
     LAUNCHER_CONFIGFILE = "@Launcher_ConfigFile@";
     LAUNCHER_GIT = "@Launcher_Git@";
     LAUNCHER_APPID = "@Launcher_AppID@";
+    LAUNCHER_URLSCHEME = "@Launcher_URLScheme@";
     LAUNCHER_SVGFILENAME = "@Launcher_SVGFileName@";
     LAUNCHER_ENVNAME = "@Launcher_ENVName@";
 
