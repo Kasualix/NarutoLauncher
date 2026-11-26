@@ -49,20 +49,13 @@
 #include "java/JavaInstallList.h"
 #include "java/JavaUtils.h"
 
-#ifdef Q_OS_WIN
 #include <windows.h>
-#endif
-
-#define IBUS "@im=ibus"
 
 JavaUtils::JavaUtils() {}
 
 QString stripVariableEntries(QString name, QString target, QString remove)
 {
-    char delimiter = ':';
-#ifdef Q_OS_WIN32
-    delimiter = ';';
-#endif
+    char delimiter = ';';
 
     auto targetItems = target.split(delimiter);
     auto toRemove = remove.split(delimiter);
@@ -85,9 +78,6 @@ QProcessEnvironment CleanEnviroment()
                             "JRE_HOME",  "_JAVA_OPTIONS", "JAVA_OPTIONS", "JAVA_TOOL_OPTIONS" };
 
     QStringList stripped = {
-#if defined(Q_OS_LINUX) || defined(Q_OS_FREEBSD) || defined(Q_OS_OPENBSD)
-        "LD_LIBRARY_PATH", "LD_PRELOAD",
-#endif
         "QT_PLUGIN_PATH", "QT_FONTPATH"
     };
     for (auto key : rawenv.keys()) {
@@ -112,24 +102,9 @@ QProcessEnvironment CleanEnviroment()
 
             value = newValue;
         }
-#if defined(Q_OS_LINUX) || defined(Q_OS_FREEBSD) || defined(Q_OS_OPENBSD)
-        // Strip IBus
-        // IBus is a Linux IME framework. For some reason, it breaks MC?
-        if (key == "XMODIFIERS" && value.contains(IBUS)) {
-            QString save = value;
-            value.replace(IBUS, "");
-            qDebug() << "Env: stripped" << IBUS << "from" << save << ":" << value;
-        }
-#endif
         // qDebug() << "Env: " << key << value;
         env.insert(key, value);
     }
-#ifdef Q_OS_LINUX
-    // HACK: Workaround for QTBUG-42500
-    if (!env.contains("LD_LIBRARY_PATH")) {
-        env.insert("LD_LIBRARY_PATH", "");
-    }
-#endif
 
     return env;
 }
@@ -151,11 +126,7 @@ JavaInstallPtr JavaUtils::GetDefaultJava()
 
     javaVersion->id = "java";
     javaVersion->arch = "unknown";
-#if defined(Q_OS_WIN32)
     javaVersion->path = "javaw";
-#else
-    javaVersion->path = "java";
-#endif
 
     return javaVersion;
 }
@@ -163,7 +134,6 @@ JavaInstallPtr JavaUtils::GetDefaultJava()
 QStringList addJavasFromEnv(QList<QString> javas)
 {
     auto env = QProcessEnvironment::systemEnvironment().value(QStringLiteral("%1_JAVA_PATHS").arg(BuildConfig.LAUNCHER_ENVNAME));
-#if defined(Q_OS_WIN32)
     QList<QString> javaPaths = env.replace("\\", "/").split(QLatin1String(";"));
 
     auto envPath = qEnvironmentVariable("PATH");
@@ -171,16 +141,12 @@ QStringList addJavasFromEnv(QList<QString> javas)
     for (QString string : javaPathsfromPath) {
         javaPaths.append(string + "/javaw.exe");
     }
-#else
-    QList<QString> javaPaths = env.split(QLatin1String(":"));
-#endif
     for (QString i : javaPaths) {
         javas.append(i);
     };
     return javas;
 }
 
-#if defined(Q_OS_WIN32)
 QList<JavaInstallPtr> JavaUtils::FindJavaFromRegistryKey(std::uint32_t keyType, QString keyName, QString keyJavaDir, QString subkeySuffix)
 {
     QList<JavaInstallPtr> javas;
@@ -362,157 +328,6 @@ QList<QString> JavaUtils::FindJavaPaths()
     return candidates;
 }
 
-#elif defined(Q_OS_MACOS)
-QList<QString> JavaUtils::FindJavaPaths()
-{
-    QList<QString> javas;
-    javas.append(this->GetDefaultJava()->path);
-    javas.append("/Applications/Xcode.app/Contents/Applications/Application Loader.app/Contents/MacOS/itms/java/bin/java");
-    javas.append("/Library/Internet Plug-Ins/JavaAppletPlugin.plugin/Contents/Home/bin/java");
-    javas.append("/System/Library/Frameworks/JavaVM.framework/Versions/Current/Commands/java");
-    QDir libraryJVMDir("/Library/Java/JavaVirtualMachines/");
-    QStringList libraryJVMJavas = libraryJVMDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
-    for (const QString& java : libraryJVMJavas) {
-        javas.append(libraryJVMDir.absolutePath() + "/" + java + "/Contents/Home/bin/java");
-        javas.append(libraryJVMDir.absolutePath() + "/" + java + "/Contents/Home/jre/bin/java");
-    }
-    QDir systemLibraryJVMDir("/System/Library/Java/JavaVirtualMachines/");
-    QStringList systemLibraryJVMJavas = systemLibraryJVMDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
-    for (const QString& java : systemLibraryJVMJavas) {
-        javas.append(systemLibraryJVMDir.absolutePath() + "/" + java + "/Contents/Home/bin/java");
-        javas.append(systemLibraryJVMDir.absolutePath() + "/" + java + "/Contents/Commands/java");
-    }
-
-    auto home = qEnvironmentVariable("HOME");
-
-    // javas downloaded by sdkman
-    QString sdkmanDir = qEnvironmentVariable("SDKMAN_DIR", FS::PathCombine(home, ".sdkman"));
-    QDir sdkmanJavaDir(FS::PathCombine(sdkmanDir, "candidates/java"));
-    QStringList sdkmanJavas = sdkmanJavaDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
-    for (const QString& java : sdkmanJavas) {
-        javas.append(sdkmanJavaDir.absolutePath() + "/" + java + "/bin/java");
-    }
-
-    // javas downloaded by asdf
-    QString asdfDataDir = qEnvironmentVariable("ASDF_DATA_DIR", FS::PathCombine(home, ".asdf"));
-    QDir asdfJavaDir(FS::PathCombine(asdfDataDir, "installs/java"));
-    QStringList asdfJavas = asdfJavaDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
-    for (const QString& java : asdfJavas) {
-        javas.append(asdfJavaDir.absolutePath() + "/" + java + "/bin/java");
-    }
-
-    // java in user library folder (like from intellij downloads)
-    QDir userLibraryJVMDir(FS::PathCombine(home, "Library/Java/JavaVirtualMachines/"));
-    QStringList userLibraryJVMJavas = userLibraryJVMDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
-    for (const QString& java : userLibraryJVMJavas) {
-        javas.append(userLibraryJVMDir.absolutePath() + "/" + java + "/Contents/Home/bin/java");
-        javas.append(userLibraryJVMDir.absolutePath() + "/" + java + "/Contents/Commands/java");
-    }
-
-    javas.append(getMinecraftJavaBundle());
-    javas.append(getPrismJavaBundle());
-    javas = addJavasFromEnv(javas);
-    javas.removeDuplicates();
-    return javas;
-}
-
-#elif defined(Q_OS_LINUX) || defined(Q_OS_OPENBSD) || defined(Q_OS_FREEBSD)
-QList<QString> JavaUtils::FindJavaPaths()
-{
-    QList<QString> javas;
-    javas.append(this->GetDefaultJava()->path);
-    auto scanJavaDir = [&javas](
-                           const QString& dirPath,
-                           const std::function<bool(const QFileInfo&)>& filter = [](const QFileInfo&) { return true; }) {
-        QDir dir(dirPath);
-        if (!dir.exists())
-            return;
-        auto entries = dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
-        for (auto& entry : entries) {
-            if (!filter(entry))
-                continue;
-
-            QString prefix;
-            prefix = entry.canonicalFilePath();
-            javas.append(FS::PathCombine(prefix, "jre/bin/java"));
-            javas.append(FS::PathCombine(prefix, "bin/java"));
-        }
-    };
-    // java installed in a snap is installed in the standard directory, but underneath $SNAP
-    auto snap = qEnvironmentVariable("SNAP");
-    auto scanJavaDirs = [scanJavaDir, snap](const QString& dirPath) {
-        scanJavaDir(dirPath);
-        if (!snap.isNull()) {
-            scanJavaDir(snap + dirPath);
-        }
-    };
-#if defined(Q_OS_LINUX)
-    // oracle RPMs
-    scanJavaDirs("/usr/java");
-    // general locations used by distro packaging
-    scanJavaDirs("/usr/lib/jvm");
-    scanJavaDirs("/usr/lib64/jvm");
-    scanJavaDirs("/usr/lib32/jvm");
-    // Gentoo's locations for openjdk and openjdk-bin respectively
-    auto gentooFilter = [](const QFileInfo& info) {
-        QString fileName = info.fileName();
-        return fileName.startsWith("openjdk-") || fileName.startsWith("openj9-");
-    };
-    // AOSC OS's locations for openjdk
-    auto aoscFilter = [](const QFileInfo& info) {
-        QString fileName = info.fileName();
-        return fileName == "java" || fileName.startsWith("java-");
-    };
-    scanJavaDir("/usr/lib64", gentooFilter);
-    scanJavaDir("/usr/lib", gentooFilter);
-    scanJavaDir("/opt", gentooFilter);
-    scanJavaDir("/usr/lib", aoscFilter);
-    // javas stored in Prism Launcher's folder
-    scanJavaDirs("java");
-    // manually installed JDKs in /opt
-    scanJavaDirs("/opt/jdk");
-    scanJavaDirs("/opt/jdks");
-    scanJavaDirs("/opt/ibm");  // IBM Semeru Certified Edition
-    // flatpak
-    scanJavaDirs("/app/jdk");
-#elif defined(Q_OS_OPENBSD) || defined(Q_OS_FREEBSD)
-    // ports install to /usr/local on OpenBSD & FreeBSD
-    scanJavaDirs("/usr/local");
-#endif
-    auto home = qEnvironmentVariable("HOME");
-
-    // javas downloaded by IntelliJ
-    scanJavaDirs(FS::PathCombine(home, ".jdks"));
-    // javas downloaded by sdkman
-    QString sdkmanDir = qEnvironmentVariable("SDKMAN_DIR", FS::PathCombine(home, ".sdkman"));
-    scanJavaDirs(FS::PathCombine(sdkmanDir, "candidates/java"));
-    // javas downloaded by asdf
-    QString asdfDataDir = qEnvironmentVariable("ASDF_DATA_DIR", FS::PathCombine(home, ".asdf"));
-    scanJavaDirs(FS::PathCombine(asdfDataDir, "installs/java"));
-    // javas downloaded by gradle (toolchains)
-    QString gradleUserHome = qEnvironmentVariable("GRADLE_USER_HOME", FS::PathCombine(home, ".gradle"));
-    scanJavaDirs(FS::PathCombine(gradleUserHome, "jdks"));
-
-    javas.append(getMinecraftJavaBundle());
-    javas.append(getPrismJavaBundle());
-    javas = addJavasFromEnv(javas);
-    javas.removeDuplicates();
-    return javas;
-}
-#else
-QList<QString> JavaUtils::FindJavaPaths()
-{
-    qDebug() << "Unknown operating system build - defaulting to \"java\"";
-
-    QList<QString> javas;
-    javas.append(this->GetDefaultJava()->path);
-
-    javas.append(getMinecraftJavaBundle());
-    javas.append(getPrismJavaBundle());
-    javas.removeDuplicates();
-    return addJavasFromEnv(javas);
-}
-#endif
 
 QString JavaUtils::getJavaCheckPath()
 {
@@ -528,10 +343,6 @@ QString JavaUtils::getPinnedPath(int major)
 QStringList getMinecraftJavaBundle()
 {
     QStringList processpaths;
-#if defined(Q_OS_MACOS)
-    processpaths << FS::PathCombine(QDir::homePath(), FS::PathCombine("Library", "Application Support", "minecraft", "runtime"));
-#elif defined(Q_OS_WIN32)
-
     auto appDataPath = QProcessEnvironment::systemEnvironment().value("APPDATA", "");
     processpaths << FS::PathCombine(QFileInfo(appDataPath).absoluteFilePath(), ".minecraft", "runtime");
 
@@ -541,9 +352,6 @@ QStringList getMinecraftJavaBundle()
     auto minecraftMSStorePath =
         FS::PathCombine(QFileInfo(localAppDataPath).absoluteFilePath(), "Packages", "Microsoft.4297127D64EC6_8wekyb3d8bbwe");
     processpaths << FS::PathCombine(minecraftMSStorePath, "LocalCache", "Local", "runtime");
-#else
-    processpaths << FS::PathCombine(QDir::homePath(), ".minecraft", "runtime");
-#endif
 
     QStringList javas;
     while (!processpaths.isEmpty()) {
@@ -569,11 +377,7 @@ QStringList getMinecraftJavaBundle()
     return javas;
 }
 
-#if defined(Q_OS_WIN32)
 const QString JavaUtils::javaExecutable = "javaw.exe";
-#else
-const QString JavaUtils::javaExecutable = "java";
-#endif
 
 QStringList getPrismJavaBundle()
 {

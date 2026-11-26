@@ -47,11 +47,7 @@ void JProfiler::beginProfilingImpl(LaunchTask* process)
     QStringList profilerArgs = { "-d", QString::number(process->pid()), "--gui", "-p", QString::number(listeningPort) };
     auto basePath = globalSettings->get("JProfilerPath").toString();
 
-#ifdef Q_OS_WIN
     QString profilerProgram = QDir(basePath).absoluteFilePath("bin/jpenable.exe");
-#else
-    QString profilerProgram = QDir(basePath).absoluteFilePath("bin/jpenable");
-#endif
 
     profiler->setArguments(profilerArgs);
     profiler->setProgram(profilerProgram);

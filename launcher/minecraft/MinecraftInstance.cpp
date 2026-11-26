@@ -99,56 +99,6 @@
 #include <QStandardPaths>
 #include <QWindow>
 
-#ifdef Q_OS_LINUX
-#include "LibraryUtils.h"
-#endif
-
-#ifdef WITH_QTDBUS
-#include <QtDBus/QtDBus>
-#endif
-
-#define IBUS "@im=ibus"
-
-[[maybe_unused]] static bool switcherooSetupGPU(QProcessEnvironment& env)
-{
-#ifdef WITH_QTDBUS
-    if (!QDBusConnection::systemBus().isConnected())
-        return false;
-
-    QDBusInterface switcheroo("net.hadess.SwitcherooControl", "/net/hadess/SwitcherooControl", "org.freedesktop.DBus.Properties",
-                              QDBusConnection::systemBus());
-
-    if (!switcheroo.isValid())
-        return false;
-
-    QDBusReply<QDBusVariant> reply =
-        switcheroo.call(QStringLiteral("Get"), QStringLiteral("net.hadess.SwitcherooControl"), QStringLiteral("GPUs"));
-    if (!reply.isValid())
-        return false;
-
-    QDBusArgument arg = qvariant_cast<QDBusArgument>(reply.value().variant());
-    QList<QVariantMap> gpus;
-    arg >> gpus;
-
-    for (const auto& gpu : gpus) {
-        QString name = qvariant_cast<QString>(gpu[QStringLiteral("Name")]);
-        bool defaultGpu = qvariant_cast<bool>(gpu[QStringLiteral("Default")]);
-        bool discrete = qvariant_cast<bool>(gpu.value(QStringLiteral("Discrete"), !defaultGpu));
-        if (discrete) {
-            QStringList envList = qvariant_cast<QStringList>(gpu[QStringLiteral("Environment")]);
-            for (int i = 0; i + 1 < envList.size(); i += 2) {
-                env.insert(envList[i], envList[i + 1]);
-            }
-            break;
-        }
-    }
-
-    return true;
-#else
-    return false;
-#endif
-}
-
 // all of this because keeping things compatible with deprecated old settings
 // if either of the settings {a, b} is true, this also resolves to true
 class OrSetting : public Setting {
@@ -227,13 +177,6 @@ void MinecraftInstance::loadSpecificSettings()
         m_settings->registerOverride(global_settings->getSetting("CustomGLFWPath"), nativeLibraryWorkaroundsOverride);
         m_settings->registerOverride(global_settings->getSetting("UseNativeSDL"), nativeLibraryWorkaroundsOverride);
         m_settings->registerOverride(global_settings->getSetting("CustomSDLPath"), nativeLibraryWorkaroundsOverride);
-
-        // Performance related options
-        auto performanceOverride = m_settings->registerSetting("OverridePerformance", false);
-        m_settings->registerOverride(global_settings->getSetting("EnableFeralGamemode"), performanceOverride);
-        m_settings->registerOverride(global_settings->getSetting("EnableMangoHud"), performanceOverride);
-        m_settings->registerOverride(global_settings->getSetting("UseDiscreteGpu"), performanceOverride);
-        m_settings->registerOverride(global_settings->getSetting("UseZink"), performanceOverride);
 
         // Miscellaneous
         auto miscellaneousOverride = m_settings->registerSetting("OverrideMiscellaneous", false);
@@ -598,37 +541,12 @@ QStringList MinecraftInstance::javaArguments()
     // custom args go first. we want to override them if we have our own here.
     args.append(extraArguments());
 
-    // OSX dock icon and name
-#ifdef Q_OS_MACOS
-    args << "-Xdock:icon=icon.png";
-    args << QString("-Xdock:name=\"%1\"").arg(windowTitle());
-#endif
     auto traits_ = traits();
-    // HACK: fix issues on macOS with 1.13 snapshots
-    // NOTE: Oracle Java option. if there are alternate jvm implementations, this would be the place to customize this for them
-#ifdef Q_OS_MACOS
-    if (traits_.contains("FirstThreadOnMacOS")) {
-        args << QString("-XstartOnFirstThread");
-    }
-#endif
 
     // HACK: Stupid hack for Intel drivers. See: https://mojang.atlassian.net/browse/MCL-767
-#ifdef Q_OS_WIN32
     args << QString(
         "-XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_"
         "minecraft.exe.heapdump");
-#endif
-
-    // LWJGL2 reads `LWJGL_DISABLE_XRANDR` to force disable xrandr usage and fall back to xf86videomode.
-    // It *SHOULD* check for the executable to exist before trying to use it for queries but it doesnt,
-    // so WE can and force disable xrandr if it is not available.
-#ifdef Q_OS_LINUX
-    // LWJGL2 is "org.lwjgl" LWJGL3 is "org.lwjgl3"
-    if (m_components->getComponent("org.lwjgl") != nullptr && QStandardPaths::findExecutable("xrandr").isEmpty()) {
-        args << QString("-DLWJGL_DISABLE_XRANDR=true");
-    }
-#endif
-
     int min = settings()->get("MinMemAlloc").toInt();
     int max = settings()->get("MaxMemAlloc").toInt();
     if (min < max) {
@@ -679,13 +597,6 @@ QMap<QString, QString> MinecraftInstance::getVariables()
     out.insert("INST_JAVA", QDir::toNativeSeparators(QDir(settings()->get("JavaPath").toString()).absolutePath()));
     out.insert("INST_JAVA_ARGS", javaArguments().join(' '));
     out.insert("NO_COLOR", "1");
-#ifdef Q_OS_MACOS
-    // get library for Steam overlay support
-    QString steamDyldInsertLibraries = qEnvironmentVariable("STEAM_DYLD_INSERT_LIBRARIES");
-    if (!steamDyldInsertLibraries.isEmpty()) {
-        out.insert("DYLD_INSERT_LIBRARIES", steamDyldInsertLibraries);
-    }
-#endif
     return out;
 }
 
@@ -719,51 +630,6 @@ QProcessEnvironment MinecraftInstance::createLaunchEnvironment()
     // prepare the process environment
     QProcessEnvironment env = createEnvironment();
 
-#ifdef Q_OS_LINUX
-    if (settings()->get("EnableMangoHud").toBool() && APPLICATION->capabilities() & Application::SupportsMangoHud) {
-        QStringList preloadList;
-        if (auto value = env.value("LD_PRELOAD"); !value.isEmpty())
-            preloadList = value.split(QLatin1String(":"));
-
-        auto mangoHudLibString = LibraryUtils::findMangoHud();
-        if (!mangoHudLibString.isEmpty()) {
-            QFileInfo mangoHudLib(mangoHudLibString);
-            QString libPath = mangoHudLib.absolutePath();
-            auto appendLib = [libPath, &preloadList](QString fileName) {
-                if (QFileInfo(FS::PathCombine(libPath, fileName)).exists())
-                    preloadList << FS::PathCombine(libPath, fileName);
-            };
-
-            // dlsym variant is only needed for OpenGL and not included in the vulkan layer
-            appendLib("libMangoHud_dlsym.so");
-            appendLib("libMangoHud_opengl.so");
-            appendLib("libMangoHud_shim.so");
-            preloadList << mangoHudLibString;
-        }
-
-        env.insert("LD_PRELOAD", preloadList.join(QLatin1String(":")));
-        env.insert("MANGOHUD", "1");
-    }
-
-    if (settings()->get("UseDiscreteGpu").toBool()) {
-        if (!switcherooSetupGPU(env)) {
-            // Open Source Drivers
-            env.insert("DRI_PRIME", "1");
-            // Proprietary Nvidia Drivers
-            env.insert("__NV_PRIME_RENDER_OFFLOAD", "1");
-            env.insert("__VK_LAYER_NV_optimus", "NVIDIA_only");
-            env.insert("__GLX_VENDOR_LIBRARY_NAME", "nvidia");
-        }
-    }
-
-    if (settings()->get("UseZink").toBool()) {
-        // taken from https://wiki.archlinux.org/title/OpenGL#OpenGL_over_Vulkan_(Zink)
-        env.insert("__GLX_VENDOR_LIBRARY_NAME", "mesa");
-        env.insert("MESA_LOADER_DRIVER_OVERRIDE", "zink");
-        env.insert("GALLIUM_DRIVER", "zink");
-        env.insert("LIBGL_KOPPER_DRI2", "1");
-    }
-#endif
     return env;
 }
 

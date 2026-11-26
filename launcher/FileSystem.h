@@ -370,10 +370,8 @@ QString RemoveInvalidPathChars(QString string, QChar replaceWith = '-');
 
 QString DirNameFromString(const QString& string, const QStringList& inDirs = { "." });
 
-#if defined(Q_OS_WIN) || defined(Q_OS_MACOS)
 // "Safely" quote the CLI arguments for use in a desktop shortcut
 QString quoteShortcutArgs(const QStringList& args);
-#endif
 
 /// Checks if the a given Path contains "!"
 bool checkProblemticPathJava(const QDir& folder);
@@ -560,13 +558,7 @@ class clone : public QObject {
  */
 bool clone_file(const QString& src, const QString& dst, std::error_code& ec);
 
-#if defined(Q_OS_WIN)
 bool win_ioctl_clone(const std::wstring& src_path, const std::wstring& dst_path, std::error_code& ec);
-#elif defined(Q_OS_LINUX)
-bool linux_ficlone(const std::string& srcPath, const std::string& dstPath, std::error_code& ec);
-#elif defined(Q_OS_MACOS) || defined(Q_OS_FREEBSD) || defined(Q_OS_OPENBSD)
-bool macos_bsd_clonefile(const std::string& src_path, const std::string& dst_path, std::error_code& ec);
-#endif
 
 static const QList<FilesystemType> g_non_link_filesystems = {
     FilesystemType::FAT,
@@ -588,9 +580,7 @@ bool canLink(const QString& src, const QString& dst);
 
 uintmax_t hardLinkCount(const QString& path);
 
-#ifdef Q_OS_WIN
 QString getPathNameInLocal8bit(const QString& file);
-#endif
 
 QString getUniqueResourceName(const QString& filePath);
 

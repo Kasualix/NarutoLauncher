@@ -53,10 +53,6 @@
 #include "minecraft/MinecraftInstance.h"
 #include "minecraft/PackProfile.h"
 #include "net/Mode.h"
-#if defined(Q_OS_MACOS)
-#include "java/download/SymlinkTask.h"
-#include "tasks/SequentialTask.h"
-#endif
 AutoInstallJava::AutoInstallJava(LaunchTask* parent)
     : LaunchStep(parent), m_instance(m_parent->instance()), m_supported_arch(SysInfo::getSupportedJavaArchitecture()) {};
 
@@ -194,12 +190,6 @@ void AutoInstallJava::downloadJava(Meta::Version::Ptr version, QString javaName)
                     emitFailed(tr("Could not determine Java download type!"));
                     return;
             }
-#if defined(Q_OS_MACOS)
-            auto seq = makeShared<SequentialTask>(tr("Install Java"));
-            seq->addTask(m_current_task);
-            seq->addTask(makeShared<Java::SymlinkTask>(finalPath));
-            m_current_task = seq;
-#endif
             connect(m_current_task.get(), &Task::failed, this, [this, deletePath](const QString& reason) {
                 deletePath();
                 emitFailed(reason);

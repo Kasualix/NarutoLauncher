@@ -2,7 +2,6 @@
 #ifndef PRISM_PRECOMPILED_BASE_HEADERS_H
 #define PRISM_PRECOMPILED_BASE_HEADERS_H
 
-#ifdef Q_OS_WIN
 #include <windows.h>
 
 #include <consoleapi.h>
@@ -17,7 +16,6 @@
 #include <winnls.h>
 
 #include <winrt/base.h>
-#endif
 
 #include <algorithm>
 #include <cstddef>

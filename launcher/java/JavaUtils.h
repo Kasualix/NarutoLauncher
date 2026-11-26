@@ -18,11 +18,8 @@
 #include <QProcess>
 #include <QStringList>
 #include <array>
-#include "java/JavaInstall.h"
-
-#ifdef Q_OS_WIN
 #include <cstdint>
-#endif
+#include "java/JavaInstall.h"
 
 QString stripVariableEntries(QString name, QString target, QString remove);
 QProcessEnvironment CleanEnviroment();
@@ -38,9 +35,7 @@ class JavaUtils : public QObject {
     QList<QString> FindJavaPaths();
     JavaInstallPtr GetDefaultJava();
 
-#ifdef Q_OS_WIN
     QList<JavaInstallPtr> FindJavaFromRegistryKey(std::uint32_t keyType, QString keyName, QString keyJavaDir, QString subkeySuffix = "");
-#endif
 
     static QString getJavaCheckPath();
     static const QString javaExecutable;

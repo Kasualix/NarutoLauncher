@@ -76,16 +76,15 @@ CreateShortcutDialog::CreateShortcutDialog(MinecraftInstance* instance, QWidget*
     }
 
     // Populate save targets
-    if (!DesktopServices::isFlatpak()) {
-        QString desktopDir = FS::getDesktopDir();
-        QString applicationDir = FS::getApplicationsDir();
+    QString desktopDir = FS::getDesktopDir();
+    QString applicationDir = FS::getApplicationsDir();
 
-        if (!desktopDir.isEmpty())
-            ui->saveTargetSelectionBox->addItem(tr("Desktop"), QVariant::fromValue(ShortcutTarget::Desktop));
+    if (!desktopDir.isEmpty())
+        ui->saveTargetSelectionBox->addItem(tr("Desktop"), QVariant::fromValue(ShortcutTarget::Desktop));
 
-        if (!applicationDir.isEmpty())
-            ui->saveTargetSelectionBox->addItem(tr("Applications"), QVariant::fromValue(ShortcutTarget::Applications));
-    }
+    if (!applicationDir.isEmpty())
+        ui->saveTargetSelectionBox->addItem(tr("Applications"), QVariant::fromValue(ShortcutTarget::Applications));
+
     ui->saveTargetSelectionBox->addItem(tr("Other..."), QVariant::fromValue(ShortcutTarget::Other));
 
     // Populate worlds

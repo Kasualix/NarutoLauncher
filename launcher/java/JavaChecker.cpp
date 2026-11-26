@@ -56,9 +56,7 @@ void JavaChecker::executeTask()
         qDebug() << "Java checker library could not be found. Please check your installation.";
         return;
     }
-#ifdef Q_OS_WIN
     checkerJar = FS::getPathNameInLocal8bit(checkerJar);
-#endif
 
     QStringList args;
     m_process = std::make_unique<QProcess>();
@@ -138,10 +136,6 @@ void JavaChecker::finished(int exitcode, QProcess::ExitStatus status)
     QStringList lines = m_stdout.split("\n", Qt::SkipEmptyParts);
     for (QString line : lines) {
         line = line.trimmed();
-        // NOTE: workaround for GH-4125, where garbage is getting printed into stdout on bedrock linux
-        if (line.contains("/bedrock/strata")) {
-            continue;
-        }
 
         auto parts = line.split('=', Qt::SkipEmptyParts);
         if (parts.size() != 2 || parts[0].isEmpty() || parts[1].isEmpty()) {

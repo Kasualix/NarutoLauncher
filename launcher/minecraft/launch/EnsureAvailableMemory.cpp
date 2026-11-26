@@ -25,48 +25,6 @@ EnsureAvailableMemory::EnsureAvailableMemory(LaunchTask* parent, MinecraftInstan
 
 void EnsureAvailableMemory::executeTask()
 {
-#ifdef Q_OS_MACOS
-    QString text;
-    switch (MacOSHardwareInfo::memoryPressureLevel()) {
-        case MacOSHardwareInfo::MemoryPressureLevel::Normal:
-            emitSucceeded();
-            return;
-        case MacOSHardwareInfo::MemoryPressureLevel::Warning:
-            text =
-                tr("The system is under increased memory pressure.\n"
-                   "This may lead to lag or slowdowns.\n"
-                   "If possible, close other applications before continuing.\n\n"
-                   "Launch anyway?");
-            break;
-        case MacOSHardwareInfo::MemoryPressureLevel::Critical:
-            text =
-                tr("Your system is under critical memory pressure.\n"
-                   "This may lead to severe slowdowns, crashes or system instability.\n"
-                   "It is recommended to close other applications or restart your system.\n\n"
-                   "Launch anyway?");
-            break;
-    }
-
-    bool shouldAbort = false;
-
-    if (m_instance->settings()->get("LowMemWarning").toBool()) {
-        auto* dialog = CustomMessageBox::selectable(nullptr, tr("High memory pressure"), text, QMessageBox::Icon::Warning,
-                                                    QMessageBox::StandardButton::Yes | QMessageBox::StandardButton::No,
-                                                    QMessageBox::StandardButton::No);
-
-        shouldAbort = dialog->exec() == QMessageBox::No;
-    }
-
-    const auto message = tr("The system is under high memory pressure");
-    if (shouldAbort) {
-        emit logLine(message, MessageLevel::Fatal);
-        emitFailed(message);
-        return;
-    }
-
-    emit logLine(message, MessageLevel::Warning);
-    emitSucceeded();
-#else
     const uint64_t available = HardwareInfo::availableRamMiB();
     if (available == 0) {
         // could not read
@@ -107,5 +65,4 @@ void EnsureAvailableMemory::executeTask()
     }
 
     emitSucceeded();
-#endif
 }

@@ -94,15 +94,6 @@ set(CORE_SOURCES
     # Assertion helper
     AssertHelpers.h
 )
-if (UNIX AND NOT CYGWIN AND NOT APPLE)
-    set(CORE_SOURCES
-    ${CORE_SOURCES}
-
-    # LibraryUtils
-    LibraryUtils.h
-    LibraryUtils.cpp
-    )
-endif()
 
 set(NET_SOURCES
     # network stuffs
@@ -162,11 +153,6 @@ set(LAUNCH_SOURCES
 # Old update system
 set(UPDATE_SOURCES
     updater/ExternalUpdater.h
-)
-
-set(MAC_UPDATE_SOURCES
-    updater/MacSparkleUpdater.h
-    updater/MacSparkleUpdater.mm
 )
 
 set(PRISM_UPDATE_SOURCES
@@ -726,13 +712,6 @@ ecm_qt_export_logging_category(
 
 
 
-if(KDE_INSTALL_LOGGINGCATEGORIESDIR)  # only install if there is a standard path for this
-    ecm_qt_install_logging_categories(
-        EXPORT "${Launcher_Name}"
-        DESTINATION "${KDE_INSTALL_LOGGINGCATEGORIESDIR}"
-    )
-endif()
-
 ################################ COMPILE ################################
 
 set(LOGIC_SOURCES
@@ -759,11 +738,7 @@ set(LOGIC_SOURCES
     ${ATLAUNCHER_SOURCES}
 )
 
-if(APPLE AND Launcher_ENABLE_UPDATER)
-    set (LOGIC_SOURCES ${LOGIC_SOURCES} ${MAC_UPDATE_SOURCES})
-else()
-    set (LOGIC_SOURCES ${LOGIC_SOURCES} ${PRISM_UPDATE_SOURCES})
-endif()
+set (LOGIC_SOURCES ${LOGIC_SOURCES} ${PRISM_UPDATE_SOURCES})
 
 SET(LAUNCHER_SOURCES
     # Application base
@@ -1155,38 +1130,18 @@ SET(LAUNCHER_SOURCES
     ui/instanceview/VisualGroup.h
 )
 
-if (APPLE)
-    set(LAUNCHER_SOURCES
-        ${LAUNCHER_SOURCES}
-        ui/themes/ThemeManager.mm
-    )
-endif()
-
-if (NOT Apple)
-    set(LAUNCHER_SOURCES
+set(LAUNCHER_SOURCES
     ${LAUNCHER_SOURCES}
 
     ui/dialogs/UpdateAvailableDialog.h
     ui/dialogs/UpdateAvailableDialog.cpp
 )
-endif()
 
-if (APPLE)
-    set(LAUNCHER_SOURCES
-        ${LAUNCHER_SOURCES}
-
-        macsandbox/SecurityBookmarkFileAccess.h
-        macsandbox/SecurityBookmarkFileAccess.mm
-    )
-endif()
-
-if(WIN32)
-    set(LAUNCHER_SOURCES
-        console/WindowsConsole.h
-        console/WindowsConsole.cpp
-        ${LAUNCHER_SOURCES}
-    )
-endif()
+set(LAUNCHER_SOURCES
+    console/WindowsConsole.h
+    console/WindowsConsole.cpp
+    ${LAUNCHER_SOURCES}
+)
 
 qt_add_resources(LAUNCHER_RESOURCES
     resources/backgrounds/backgrounds.qrc
@@ -1268,7 +1223,7 @@ if(MINGW)
     endif()
 endif()
 
-if(TARGET PkgConfig::libqrencode)
+if (TARGET PkgConfig::libqrencode)
     target_link_libraries(Launcher_logic PkgConfig::libqrencode)
 else()
     target_include_directories(Launcher_logic PRIVATE ${LIBQRENCODE_INCLUDE_DIR})
@@ -1286,12 +1241,6 @@ else()
     target_link_libraries(Launcher_logic LibArchive::LibArchive)
 endif()
 
-if (Launcher_ENABLE_GAMEMODE)
-    target_link_libraries(Launcher_logic PkgConfig::gamemode)
-    # Must be public
-    target_compile_definitions(Launcher_logic PUBLIC ENABLE_GAMEMODE)
-endif()
-
 target_link_libraries(Launcher_logic
     Qt${QT_VERSION_MAJOR}::Core
     Qt${QT_VERSION_MAJOR}::Xml
@@ -1301,42 +1250,14 @@ target_link_libraries(Launcher_logic
     Qt${QT_VERSION_MAJOR}::Widgets
     Qt${QT_VERSION_MAJOR}::NetworkAuth
     Qt${QT_VERSION_MAJOR}::OpenGL
-    ${Launcher_QT_DBUS}
-    ${Launcher_QT_LIBS}
 )
 target_link_libraries(Launcher_logic
     cmark::cmark
     LocalPeer
     Launcher_rainbow
 )
-if (TARGET ${Launcher_QT_DBUS})
-    target_compile_definitions(Launcher_logic PUBLIC WITH_QTDBUS)
-endif()
 
-if(APPLE)
-    set(CMAKE_MACOSX_RPATH 1)
-    set(CMAKE_INSTALL_RPATH "@loader_path/../Frameworks/")
-
-    if(Launcher_ENABLE_UPDATER)
-        file(DOWNLOAD ${MACOSX_SPARKLE_DOWNLOAD_URL} ${CMAKE_BINARY_DIR}/Sparkle.tar.xz EXPECTED_HASH SHA256=${MACOSX_SPARKLE_SHA256})
-        file(ARCHIVE_EXTRACT INPUT ${CMAKE_BINARY_DIR}/Sparkle.tar.xz DESTINATION ${CMAKE_BINARY_DIR}/frameworks/Sparkle)
-
-        find_library(SPARKLE_FRAMEWORK Sparkle "${CMAKE_BINARY_DIR}/frameworks/Sparkle")
-        add_compile_definitions(SPARKLE_ENABLED)
-    endif()
-
-    target_link_libraries(Launcher_logic
-        "-framework AppKit"
-        "-framework Carbon"
-        "-framework Foundation"
-        "-framework ApplicationServices"
-    )
-    if(Launcher_ENABLE_UPDATER)
-        target_link_libraries(Launcher_logic ${SPARKLE_FRAMEWORK})
-    endif()
-endif()
-
-add_executable(${Launcher_Name} MACOSX_BUNDLE WIN32 main.cpp ${LAUNCHER_RCS})
+add_executable(${Launcher_Name} WIN32 main.cpp ${LAUNCHER_RCS})
 target_link_options(${Launcher_Name} PRIVATE
     # /MANIFEST:NO disables generating a manifest file, we instead provide our own
     $<$<STREQUAL:${CMAKE_CXX_COMPILER_FRONTEND_VARIANT},MSVC>:/MANIFEST:NO>
@@ -1351,9 +1272,6 @@ target_link_libraries(${Launcher_Name} Launcher_logic)
 if(DEFINED Launcher_APP_BINARY_NAME)
     set_target_properties(${Launcher_Name} PROPERTIES OUTPUT_NAME "${Launcher_APP_BINARY_NAME}")
 endif()
-if(DEFINED Launcher_BINARY_RPATH)
-    SET_TARGET_PROPERTIES(${Launcher_Name} PROPERTIES INSTALL_RPATH "${Launcher_BINARY_RPATH}")
-endif()
 
 if(DEFINED Launcher_APP_BINARY_DEFS)
     target_compile_definitions(${Launcher_Name} PRIVATE ${Launcher_APP_BINARY_DEFS})
@@ -1362,10 +1280,7 @@ endif()
 
 install(TARGETS ${Launcher_Name}
     RUNTIME_DEPENDENCY_SET LAUNCHER_DEPENDENCY_SET
-    BUNDLE DESTINATION "." COMPONENT Runtime
-    LIBRARY DESTINATION ${LIBRARY_DEST_DIR} COMPONENT Runtime
     RUNTIME DESTINATION ${BINARY_DEST_DIR} COMPONENT Runtime
-    FRAMEWORK DESTINATION ${FRAMEWORK_DEST_DIR} COMPONENT Runtime
 )
 
 # Deploy PDBs
@@ -1388,7 +1303,6 @@ if(Launcher_BUILD_UPDATER)
         Qt${QT_VERSION_MAJOR}::Widgets
         Qt${QT_VERSION_MAJOR}::Core
         Qt${QT_VERSION_MAJOR}::Network
-        ${Launcher_QT_LIBS}
         cmark::cmark
         # Required for WinRT
         $<$<STREQUAL:${CMAKE_SYSTEM_NAME},Windows>:WindowsApp>
@@ -1411,15 +1325,9 @@ if(Launcher_BUILD_UPDATER)
     if(DEFINED Launcher_APP_BINARY_NAME)
         set_target_properties("${Launcher_Name}_updater" PROPERTIES OUTPUT_NAME "${Launcher_APP_BINARY_NAME}_updater")
     endif()
-    if(DEFINED Launcher_BINARY_RPATH)
-        SET_TARGET_PROPERTIES("${Launcher_Name}_updater" PROPERTIES INSTALL_RPATH "${Launcher_BINARY_RPATH}")
-    endif()
 
     install(TARGETS "${Launcher_Name}_updater"
-        BUNDLE DESTINATION "." COMPONENT Runtime
-        LIBRARY DESTINATION ${LIBRARY_DEST_DIR} COMPONENT Runtime
         RUNTIME DESTINATION ${BINARY_DEST_DIR} COMPONENT Runtime
-        FRAMEWORK DESTINATION ${FRAMEWORK_DEST_DIR} COMPONENT Runtime
     )
 
     # Deploy PDBs
@@ -1428,7 +1336,7 @@ if(Launcher_BUILD_UPDATER)
     endif()
 endif()
 
-if(WIN32 OR (DEFINED Launcher_BUILD_FILELINKER AND Launcher_BUILD_FILELINKER))
+if(WIN32)
     # File link
     add_library(filelink_logic STATIC ${LINKEXE_SOURCES})
 
@@ -1444,7 +1352,6 @@ if(WIN32 OR (DEFINED Launcher_BUILD_FILELINKER AND Launcher_BUILD_FILELINKER))
         Qt${QT_VERSION_MAJOR}::Core
         Qt${QT_VERSION_MAJOR}::Network
         # Qt${QT_VERSION_MAJOR}::Concurrent
-        ${Launcher_QT_LIBS}
         # Required for WinRT
         $<$<STREQUAL:${CMAKE_SYSTEM_NAME},Windows>:WindowsApp>
         $<$<BOOL:${USE_VCPKG_WINRT}>:Microsoft::CppWinRT>
@@ -1469,28 +1376,15 @@ if(WIN32 OR (DEFINED Launcher_BUILD_FILELINKER AND Launcher_BUILD_FILELINKER))
     if(DEFINED Launcher_APP_BINARY_NAME)
         set_target_properties("${Launcher_Name}_filelink" PROPERTIES OUTPUT_NAME "${Launcher_APP_BINARY_NAME}_filelink")
     endif()
-    if(DEFINED Launcher_BINARY_RPATH)
-        SET_TARGET_PROPERTIES("${Launcher_Name}_filelink" PROPERTIES INSTALL_RPATH "${Launcher_BINARY_RPATH}")
-    endif()
 
     install(TARGETS "${Launcher_Name}_filelink"
-        BUNDLE DESTINATION "." COMPONENT Runtime
-        LIBRARY DESTINATION ${LIBRARY_DEST_DIR} COMPONENT Runtime
         RUNTIME DESTINATION ${BINARY_DEST_DIR} COMPONENT Runtime
-        FRAMEWORK DESTINATION ${FRAMEWORK_DEST_DIR} COMPONENT Runtime
     )
 
     # Deploy PDBs
     if(CMAKE_CXX_LINKER_SUPPORTS_PDB)
         install(FILES $<TARGET_PDB_FILE:${Launcher_Name}_filelink> DESTINATION ${BINARY_DEST_DIR} OPTIONAL)
     endif()
-endif()
-
-if (UNIX AND APPLE AND Launcher_ENABLE_UPDATER)
-    # Add Sparkle updater
-    # It has to be copied here instead of just allowing fixup_bundle to install it, otherwise essential parts of
-    # the framework aren't installed
-    install(DIRECTORY ${MACOSX_SPARKLE_DIR}/Sparkle.framework DESTINATION ${FRAMEWORK_DEST_DIR} USE_SOURCE_PERMISSIONS)
 endif()
 
 # Set basic compiler warning/error flags for all targets
@@ -1519,77 +1413,69 @@ endforeach()
 
 set_target_properties(${Launcher_TARGETS} PROPERTIES COMPILE_WARNING_AS_ERROR ${Launcher_WARNING_AS_ERROR})
 
-# NOTE: Universal macOS builds (i.e., `CMAKE_OSX_ARCHITECTURES="x86_64;arm64") emit benign warnings for duplicate libraries
-# lld-link on Windows fails warns with `found both wWinMain and WinMain; using latter`
+# lld-link on Windows warns with `found both wWinMain and WinMain; using latter`
 # TODO: Maybe fix this...?
-if(NOT (CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR (MSVC AND (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_LINKER_TYPE STREQUAL "LLD"))))
+if(NOT (MSVC AND (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_LINKER_TYPE STREQUAL "LLD")))
     set_target_properties(${Launcher_TARGETS} PROPERTIES LINK_WARNING_AS_ERROR ${Launcher_WARNING_AS_ERROR})
 endif()
 
 
 #### The bundle mess! ####
-# Bundle utilities are used to complete packages for different platforms - they add all the libraries that would otherwise be missing on the target system.
+# Bundle utilities are used to complete packages - they add all the libraries that would otherwise be missing on the target system.
 # NOTE: it seems that this absolutely has to be here, and nowhere else.
-if(WIN32 OR (UNIX AND APPLE))
-    if(WIN32)
-        set(QT_DEPLOY_TOOL_OPTIONS "--no-opengl-sw --no-quick-import --no-system-d3d-compiler --no-system-dxc-compiler --skip-plugin-types generic,networkinformation")
-    endif()
+qt_generate_deploy_script(
+    TARGET ${Launcher_Name}
+    OUTPUT_SCRIPT QT_DEPLOY_SCRIPT
+    CONTENT "
+    qt_deploy_runtime_dependencies(
+        EXECUTABLE ${BINARY_DEST_DIR}/$<TARGET_FILE_NAME:${Launcher_Name}>
+        BIN_DIR ${BINARY_DEST_DIR}
+        LIBEXEC_DIR ${LIBRARY_DEST_DIR}
+        LIB_DIR ${LIBRARY_DEST_DIR}
+        PLUGINS_DIR ${PLUGIN_DEST_DIR}
+        NO_OVERWRITE
+        NO_TRANSLATIONS
+        NO_COMPILER_RUNTIME
+        DEPLOY_TOOL_OPTIONS --no-opengl-sw --no-quick-import --no-system-d3d-compiler --no-system-dxc-compiler --skip-plugin-types generic,networkinformation
+    )"
+)
 
-    qt_generate_deploy_script(
-        TARGET ${Launcher_Name}
-        OUTPUT_SCRIPT QT_DEPLOY_SCRIPT
-        CONTENT "
-        qt_deploy_runtime_dependencies(
-            EXECUTABLE ${BINARY_DEST_DIR}/$<TARGET_FILE_NAME:${Launcher_Name}>
-            BIN_DIR ${BINARY_DEST_DIR}
-            LIBEXEC_DIR ${LIBRARY_DEST_DIR}
-            LIB_DIR ${LIBRARY_DEST_DIR}
-            PLUGINS_DIR ${PLUGIN_DEST_DIR}
-            NO_OVERWRITE
-            NO_TRANSLATIONS
-            NO_COMPILER_RUNTIME
-            DEPLOY_TOOL_OPTIONS ${QT_DEPLOY_TOOL_OPTIONS}
-        )"
-    )
+# Bundle our linked dependencies
+install(
+    RUNTIME_DEPENDENCY_SET LAUNCHER_DEPENDENCY_SET
+    COMPONENT bundle
+    DIRECTORIES
+        $ENV{PATH}
+        ${CMAKE_SYSTEM_LIBRARY_PATH}
+        ${QT_LIBS_DIR}
+        ${QT_LIBEXECS_DIR}
+    PRE_EXCLUDE_REGEXES
+        "^(api-ms-win|ext-ms)-.*\\.dll$"
+        # FIXME: Why aren't these caught by the below regex???
+        "^azure.*\\.dll$"
+        "^vcruntime.*\\.dll$"
+    POST_EXCLUDE_REGEXES
+        "system32"
+    LIBRARY DESTINATION ${LIBRARY_DEST_DIR}
+    RUNTIME DESTINATION ${BINARY_DEST_DIR}
+)
+# Deploy Qt plugins
+install(
+    SCRIPT ${QT_DEPLOY_SCRIPT}
+    COMPONENT bundle
+)
 
-    # Bundle our linked dependencies
-    install(
-        RUNTIME_DEPENDENCY_SET LAUNCHER_DEPENDENCY_SET
-        COMPONENT bundle
-        DIRECTORIES
-            $ENV{PATH}
-            ${CMAKE_SYSTEM_LIBRARY_PATH}
-            ${QT_LIBS_DIR}
-            ${QT_LIBEXECS_DIR}
-        PRE_EXCLUDE_REGEXES
-            "^(api-ms-win|ext-ms)-.*\\.dll$"
-            # FIXME: Why aren't these caught by the below regex???
-            "^azure.*\\.dll$"
-            "^vcruntime.*\\.dll$"
-        POST_EXCLUDE_REGEXES
-            "system32"
-        LIBRARY DESTINATION ${LIBRARY_DEST_DIR}
-        RUNTIME DESTINATION ${BINARY_DEST_DIR}
-        FRAMEWORK DESTINATION ${FRAMEWORK_DEST_DIR}
-    )
-    # Deploy Qt plugins
-    install(
-        SCRIPT ${QT_DEPLOY_SCRIPT}
-        COMPONENT bundle
-    )
-
-    # Add qt.conf - this makes Qt stop looking for things outside the bundle
-    install(
-        CODE "file(WRITE \"\${CMAKE_INSTALL_PREFIX}/${RESOURCES_DEST_DIR}/qt.conf\" \" \")"
-        COMPONENT bundle
-    )
-    # Add qtlogging.ini as a config file
-    install(
-        FILES "qtlogging.ini"
-        DESTINATION ${CMAKE_INSTALL_PREFIX}/${RESOURCES_DEST_DIR}
-        COMPONENT bundle
-    )
-endif()
+# Add qt.conf - this makes Qt stop looking for things outside the bundle
+install(
+    CODE "file(WRITE \"\${CMAKE_INSTALL_PREFIX}/${RESOURCES_DEST_DIR}/qt.conf\" \" \")"
+    COMPONENT bundle
+)
+# Add qtlogging.ini as a config file
+install(
+    FILES "qtlogging.ini"
+    DESTINATION ${CMAKE_INSTALL_PREFIX}/${RESOURCES_DEST_DIR}
+    COMPONENT bundle
+)
 
 find_program(CLANG_FORMAT clang-format OPTIONAL)
 if(CLANG_FORMAT)

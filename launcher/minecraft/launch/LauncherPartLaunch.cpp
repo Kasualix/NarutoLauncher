@@ -43,10 +43,6 @@
 #include "launch/LaunchTask.h"
 #include "minecraft/MinecraftInstance.h"
 
-#if defined(Q_OS_LINUX) && defined(ENABLE_GAMEMODE)
-#include "gamemode_client.h"
-#endif
-
 LauncherPartLaunch::LauncherPartLaunch(LaunchTask* parent)
     : LaunchStep(parent)
     , m_process(parent->instance()->getJavaVersion().defaultsToUtf8() ? QStringConverter::Utf8 : QStringConverter::System)
@@ -111,21 +107,15 @@ void LauncherPartLaunch::executeTask()
     }
 
     auto natPath = instance->getNativePath();
-#ifdef Q_OS_WIN
     natPath = FS::getPathNameInLocal8bit(natPath);
-#endif
     args << "-Djava.library.path=" + natPath;
 
     args << "-cp";
-#ifdef Q_OS_WIN
     QStringList processed;
     for (auto& item : classPath) {
         processed << FS::getPathNameInLocal8bit(item);
     }
     args << processed.join(';');
-#else
-    args << classPath.join(':');
-#endif
     args << "org.prismlauncher.EntryPoint";
 
     qDebug() << args.join(' ');
@@ -147,15 +137,6 @@ void LauncherPartLaunch::executeTask()
     } else {
         m_process.start(javaPath, args);
     }
-
-#if defined(Q_OS_LINUX) && defined(ENABLE_GAMEMODE)
-    if (instance->settings()->get("EnableFeralGamemode").toBool() && APPLICATION->capabilities() & Application::SupportsGameMode) {
-        auto pid = m_process.processId();
-        if (pid != 0) {
-            gamemode_request_start_for(static_cast<pid_t>(pid));
-        }
-    }
-#endif
 }
 
 void LauncherPartLaunch::on_state(LoggedProcess::State state)

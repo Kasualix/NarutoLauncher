@@ -48,10 +48,6 @@ static const QVector<RegReplace> anonymizeRules = {
                "C:\\Users\\********\\"),  // windows
     RegReplace(QRegularExpression("C:\\/Users\\/([^\\/]+)\\/", QRegularExpression::CaseInsensitiveOption),
                "C:/Users/********/"),  // windows with forward slashes
-    RegReplace(QRegularExpression("(?<!\\\\w)\\/home\\/[^\\/]+\\/", QRegularExpression::CaseInsensitiveOption),
-               "/home/********/"),  // linux
-    RegReplace(QRegularExpression("(?<!\\\\w)\\/Users\\/[^\\/]+\\/", QRegularExpression::CaseInsensitiveOption),
-               "/Users/********/"),  // macos
     RegReplace(QRegularExpression("\\(Session ID is [^\\)]+\\)", QRegularExpression::CaseInsensitiveOption),
                "(Session ID is <SESSION_TOKEN>)"),  // SESSION_TOKEN
     RegReplace(QRegularExpression("new refresh token: \"[^\"]+\"", QRegularExpression::CaseInsensitiveOption),

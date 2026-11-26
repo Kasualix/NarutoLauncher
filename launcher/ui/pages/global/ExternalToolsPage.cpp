@@ -100,11 +100,7 @@ void ExternalToolsPage::setupWorldToolBrowseBtn(QTreeWidgetItem* item)
     auto* btn = new QPushButton("...");
     btn->setFixedWidth(30);
     connect(btn, &QPushButton::clicked, this, [this, item]() {
-#ifdef Q_OS_WIN
         const QString filter = tr("Executables (*.exe *.bat);;All Files (*)");
-#else
-        const QString filter = tr("All Files (*)");
-#endif
         const QString filePath = QFileDialog::getOpenFileName(this, tr("Select Executable"), QString(), filter);
         if (!filePath.isEmpty()) {
             QFileInfo fileInfo(filePath);
@@ -229,11 +225,7 @@ void ExternalToolsPage::on_jsonEditorBrowseBtn_clicked()
 {
     QString rawFile = QFileDialog::getOpenFileName(this, tr("Text Editor"),
                                                    m_ui->jsonEditorTextBox->text().isEmpty()
-#if defined(Q_OS_LINUX)
-                                                       ? QString("/usr/bin")
-#else
                                                        ? QStandardPaths::standardLocations(QStandardPaths::ApplicationsLocation).first()
-#endif
                                                        : m_ui->jsonEditorTextBox->text());
 
     if (rawFile.isEmpty()) {

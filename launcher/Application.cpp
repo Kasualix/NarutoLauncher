@@ -50,7 +50,6 @@
 #include "tools/GenericProfiler.h"
 #include "ui/InstanceWindow.h"
 #include "ui/MainWindow.h"
-#include "ui/ToolTipFilter.h"
 #include "ui/ViewLogWindow.h"
 
 #include "ui/dialogs/ProgressDialog.h"
@@ -131,35 +130,9 @@
 #include <stdlib.h>
 #include "SysInfo.h"
 
-#ifdef Q_OS_LINUX
-#include <dlfcn.h>
-#include "LibraryUtils.h"
-#endif
-
-#if defined(Q_OS_LINUX) && defined(ENABLE_GAMEMODE)
-#include "gamemode_client.h"
-#endif
-
-#if defined(Q_OS_LINUX)
-#include <sys/statvfs.h>
-#endif
-
-#if defined(Q_OS_FREEBSD) || defined(Q_OS_OPENBSD)
-#include <sys/mount.h>
-#include <sys/types.h>
-#endif
-
-#if defined(Q_OS_MACOS)
-#if defined(SPARKLE_ENABLED)
-#include "updater/MacSparkleUpdater.h"
-#endif
-#else
 #include "updater/PrismExternalUpdater.h"
-#endif
 
-#if defined Q_OS_WIN32
 #include <windows.h>
-#endif
 
 #include "console/Console.h"
 
@@ -367,17 +340,7 @@ Application::Application(int& argc, char** argv) : QApplication(argc, argv)
 
     {
         // Root path is used for updates and portable data
-#if defined(Q_OS_LINUX) || defined(Q_OS_FREEBSD) || defined(Q_OS_OPENBSD)
-        QDir foo(FS::PathCombine(binPath, ".."));  // typically portable-root or /usr
-        m_rootPath = foo.absolutePath();
-#elif defined(Q_OS_WIN32)
         m_rootPath = binPath;
-#elif defined(Q_OS_MACOS)
-        QDir foo(FS::PathCombine(binPath, "../.."));
-        m_rootPath = foo.absolutePath();
-        // on macOS, touch the root to force Finder to reload the .app metadata (and fix any icon change issues)
-        FS::updateTimestamp(m_rootPath);
-#endif
     }
 
     QString adjustedBy;
@@ -395,17 +358,11 @@ Application::Application(int& argc, char** argv) : QApplication(argc, argv)
         adjustedBy = "System environment";
         dataPath = QDir(dataDirEnv).absolutePath();
     } else {
-        QDir foo;
-        if (DesktopServices::isSnap()) {
-            foo = QDir(qEnvironmentVariable("SNAP_USER_COMMON"));
-        } else {
-            foo = QDir(FS::PathCombine(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation), ".."));
-        }
+        QDir foo(FS::PathCombine(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation), ".."));
 
         dataPath = foo.absolutePath();
         adjustedBy = "Persistent data path";
 
-#ifndef Q_OS_MACOS
         if (auto portableUserData = FS::PathCombine(m_rootPath, "UserData"); QDir(portableUserData).exists()) {
             dataPath = portableUserData;
             adjustedBy = "Portable user data path";
@@ -415,7 +372,6 @@ Application::Application(int& argc, char** argv) : QApplication(argc, argv)
             adjustedBy = "Portable data path";
             m_portable = true;
         }
-#endif
     }
 
     if (!FS::ensureFolderPathExists(dataPath)) {
@@ -553,11 +509,7 @@ Application::Application(int& argc, char** argv) : QApplication(argc, argv)
         }
         // seach root path
         if (!foundLoggingRules) {
-#if defined(Q_OS_LINUX) || defined(Q_OS_FREEBSD) || defined(Q_OS_OPENBSD)
-            logRulesPath = FS::PathCombine(m_rootPath, "share", BuildConfig.LAUNCHER_NAME, logRulesFile);
-#else
             logRulesPath = FS::PathCombine(m_rootPath, logRulesFile);
-#endif
             qInfo() << "Testing" << logRulesPath << "...";
             foundLoggingRules = QFile::exists(logRulesPath);
         }
@@ -658,16 +610,8 @@ Application::Application(int& argc, char** argv) : QApplication(argc, argv)
         m_settings->registerSetting("NetworkRetryLimit", 2);
         m_settings->registerSetting("RequestTimeout", 15);
 
-        QString defaultMonospace;
-        int defaultSize = 11;
-#ifdef Q_OS_WIN32
-        defaultMonospace = "Courier";
-        defaultSize = 10;
-#elif defined(Q_OS_MACOS)
-        defaultMonospace = "Menlo";
-#else
-        defaultMonospace = "Monospace";
-#endif
+        QString defaultMonospace = "Courier";
+        int defaultSize = 10;
 
         // resolve the font so the default actually matches
         QFont consoleFont;
@@ -701,17 +645,6 @@ Application::Application(int& argc, char** argv) : QApplication(argc, argv)
         m_settings->registerSetting("SkinsDir", "skins");
         m_settings->registerSetting("JavaDir", "java");
         m_settings->registerSetting("TemplateDir", "instance-template");
-
-#ifdef Q_OS_MACOS
-        // Folder security-scoped bookmarks
-        m_settings->registerSetting("InstanceDirBookmark", "");
-        m_settings->registerSetting("CentralModsDirBookmark", "");
-        m_settings->registerSetting("IconsDirBookmark", "");
-        m_settings->registerSetting("DownloadsDirBookmark", "");
-        m_settings->registerSetting("SkinsDirBookmark", "");
-        m_settings->registerSetting("JavaDirBookmark", "");
-        m_settings->registerSetting("TemplateDirBookmark", "");
-#endif
 
         // Editors
         m_settings->registerSetting("JsonEditor", QString());
@@ -771,12 +704,6 @@ Application::Application(int& argc, char** argv) : QApplication(argc, argv)
         m_settings->registerSetting("CustomGLFWPath", "");
         m_settings->registerSetting("UseNativeSDL", false);
         m_settings->registerSetting("CustomSDLPath", "");
-
-        // Performance related options
-        m_settings->registerSetting("EnableFeralGamemode", false);
-        m_settings->registerSetting("EnableMangoHud", false);
-        m_settings->registerSetting("UseDiscreteGpu", false);
-        m_settings->registerSetting("UseZink", false);
 
         // Game time
         m_settings->registerSetting("ShowGameTime", true);
@@ -966,22 +893,6 @@ Application::Application(int& argc, char** argv) : QApplication(argc, argv)
     // Themes
     m_themeManager = std::make_unique<ThemeManager>();
 
-#ifdef Q_OS_MACOS
-    // for macOS: getting directory settings will generate URL security-scoped bookmarks if needed and not present
-    // this facilitates a smooth transition from a non-sandboxed version of the launcher, that likely can access the directory,
-    // and a sandboxed version that can't access the directory without a bookmark
-    // this section can likely be removed once the sandboxed version has been released for a while and migrations aren't done anymore
-    {
-        m_settings->get("InstanceDir");
-        m_settings->get("CentralModsDir");
-        m_settings->get("IconsDir");
-        m_settings->get("DownloadsDir");
-        m_settings->get("SkinsDir");
-        m_settings->get("JavaDir");
-        m_settings->get("TemplateDir");
-    }
-#endif
-
     // initialize and load all instances
     {
         auto instDirSetting = m_settings->getSetting("InstanceDir");
@@ -1057,10 +968,6 @@ Application::Application(int& argc, char** argv) : QApplication(argc, argv)
     for (const auto& profiler : m_profilers.values()) {
         profiler->registerSettings(m_settings.get());
     }
-
-#ifdef Q_OS_MACOS
-    connect(this, &Application::clickedOnDock, this, [this]() { this->showMainWindow(); });
-#endif
 
     connect(this, &Application::aboutToQuit, this, [this]() {
         if (m_instances) {
@@ -1188,46 +1095,6 @@ Application::Application(int& argc, char** argv) : QApplication(argc, argv)
         }
     }
 
-    // notify user if /tmp is mounted with `noexec` (#1693)
-    QString jvmArgs = m_settings->get("JvmArgs").toString();
-    if (jvmArgs.indexOf("java.io.tmpdir") == -1) { /* java.io.tmpdir is a valid workaround, so don't annoy */
-        bool isTmpNoexec = false;
-
-#if defined(Q_OS_LINUX)
-
-        struct statvfs tmpStat{};
-        statvfs("/tmp", &tmpStat);
-        isTmpNoexec = ((tmpStat.f_flag & ST_NOEXEC) != 0U);
-
-#elif defined(Q_OS_FREEBSD) || defined(Q_OS_OPENBSD)
-
-        struct statfs tmp_stat;
-        statfs("/tmp", &tmp_stat);
-        isTmpNoexec = ((tmp_stat.f_flags & MNT_NOEXEC) != 0U);
-
-#endif
-
-        if (isTmpNoexec) {
-            auto infoMsg =
-                tr("Your /tmp directory is currently mounted with the 'noexec' flag enabled.\n"
-                   "Some versions of Minecraft may not launch.\n"
-                   "\n"
-                   "You may solve this issue by remounting /tmp as 'exec' or setting "
-                   "the java.io.tmpdir JVM argument to a writeable directory in a "
-                   "filesystem where the 'exec' flag is set (e.g., /home/user/.local/tmp)\n");
-            auto* msgBox = new QMessageBox(QMessageBox::Information, tr("Incompatible system configuration"), infoMsg, QMessageBox::Ok);
-            msgBox->setDefaultButton(QMessageBox::Ok);
-            msgBox->setAttribute(Qt::WA_DeleteOnClose);
-            msgBox->setMinimumWidth(460);
-            msgBox->adjustSize();
-            msgBox->open();
-        }
-    }
-
-    if (qgetenv("XDG_CURRENT_DESKTOP") == "gamescope") {
-        installEventFilter(new ToolTipFilter);
-    }
-
     // the setup wizard applies the selected theme itself before it is shown
     if (!createSetupWizard()) {
         m_themeManager->applyCurrentlySelectedTheme(true);
@@ -1278,12 +1145,7 @@ bool Application::createSetupWizard()
             settings()->set("IconTheme", defaultIconTheme);
         }
         if (!validWidgets) {
-#if defined(Q_OS_LINUX)
-            const QString style = "system";
-#else
             const QString style = darkMode ? QStringLiteral("dark") : QStringLiteral("bright");
-
-#endif
 
             settings()->set("ApplicationTheme", style);
         }
@@ -1322,37 +1184,16 @@ bool Application::createSetupWizard()
 
 bool Application::updaterEnabled()
 {
-#if defined(Q_OS_MACOS)
-    return BuildConfig.UPDATER_ENABLED;
-#else
     return BuildConfig.UPDATER_ENABLED && QFileInfo(FS::PathCombine(m_rootPath, updaterBinaryName())).isFile();
-#endif
 }
 
 QString Application::updaterBinaryName()
 {
-    auto exeName = QStringLiteral("%1_updater").arg(BuildConfig.LAUNCHER_APP_BINARY_NAME);
-#if defined Q_OS_WIN32
-    exeName.append(".exe");
-#else
-    exeName.prepend("bin/");
-#endif
-    return exeName;
+    return QStringLiteral("%1_updater.exe").arg(BuildConfig.LAUNCHER_APP_BINARY_NAME);
 }
 
 bool Application::event(QEvent* event)
 {
-#ifdef Q_OS_MACOS
-    if (event->type() == QEvent::ApplicationStateChange) {
-        auto ev = static_cast<QApplicationStateChangeEvent*>(event);
-
-        if (m_prevAppState == Qt::ApplicationActive && ev->applicationState() == Qt::ApplicationActive) {
-            emit clickedOnDock();
-        }
-        m_prevAppState = ev->applicationState();
-    }
-#endif
-
     if (event->type() == QEvent::FileOpen) {
         if (!m_mainWindow) {
             showMainWindow(false);
@@ -1415,13 +1256,7 @@ void Application::performMainStartupAction()
     // initialize the updater
     if (updaterEnabled()) {
         qDebug() << "Initializing updater";
-#ifdef Q_OS_MACOS
-#if defined(SPARKLE_ENABLED)
-        m_updater.reset(new MacSparkleUpdater());
-#endif
-#else
         m_updater.reset(new PrismExternalUpdater(m_mainWindow, m_rootPath, m_dataPath));
-#endif
         qDebug() << "<> Updater started.";
     }
 
@@ -1542,7 +1377,7 @@ JavaInstallList* Application::javalist()
 
 QIcon Application::logo()
 {
-    return QIcon(":/" + BuildConfig.LAUNCHER_SVGFILENAME);
+    return QIcon(":/" + BuildConfig.LAUNCHER_ICONFILENAME);
 }
 
 bool Application::openJsonEditor(const QString& filename)
@@ -1745,16 +1580,10 @@ InstanceWindow* Application::showInstanceWindow(MinecraftInstance* instance, con
     auto* window = instance->window();
 
     if (window != nullptr) {
-// If the window is minimized on macOS or Windows, activate and bring it up
-#ifdef Q_OS_MACOS
-        if (window->isMinimized()) {
-            window->setWindowState(window->windowState() & ~Qt::WindowMinimized);
-        }
-#elif defined(Q_OS_WIN)
+        // If the window is minimized, restore and bring it up
         if (window->isMinimized()) {
             window->showNormal();
         }
-#endif
 
         window->raise();
         window->activateWindow();
@@ -1868,42 +1697,15 @@ void Application::updateCapabilities()
     if (!getFlameAPIKey().isEmpty()) {
         m_capabilities |= SupportsFlame;
     }
-
-#ifdef Q_OS_LINUX
-#ifdef ENABLE_GAMEMODE
-    if (gamemode_query_status() >= 0) {
-        m_capabilities |= SupportsGameMode;
-    }
-#endif
-
-    if (!LibraryUtils::findMangoHud().isEmpty()) {
-        m_capabilities |= SupportsMangoHud;
-    }
-#endif
 }
 
-void Application::detectLibraries()
-{
-#ifdef Q_OS_LINUX
-    m_detectedGLFWPath = LibraryUtils::find(BuildConfig.GLFW_LIBRARY_NAME);
-    m_detectedOpenALPath = LibraryUtils::find(BuildConfig.OPENAL_LIBRARY_NAME);
-    m_detectedSDLPath = LibraryUtils::find(BuildConfig.SDL_LIBRARY_NAME);
-    qDebug() << "Detected native libraries:" << m_detectedGLFWPath << m_detectedOpenALPath << m_detectedSDLPath;
-#endif
-}
+void Application::detectLibraries() {}
 
 QString Application::getJarPath(const QString& jarFile)
 {
     QStringList potentialPaths = {
-#if defined(Q_OS_LINUX) || defined(Q_OS_FREEBSD) || defined(Q_OS_OPENBSD)
-        FS::PathCombine(m_rootPath, "share", BuildConfig.LAUNCHER_NAME),
-#endif
         FS::PathCombine(m_rootPath, "jars"), FS::PathCombine(applicationDirPath(), "jars"),
-#if defined(Q_OS_MACOS)
-        FS::PathCombine(applicationDirPath(), "../../../..", "jars")  // from inside build dir, for debuging
-#else
         FS::PathCombine(applicationDirPath(), "..", "jars")  // from inside build dir, for debuging
-#endif
     };
     for (const auto& p : potentialPaths) {
         QString jarPath = FS::PathCombine(p, jarFile);

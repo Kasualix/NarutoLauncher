@@ -168,13 +168,7 @@ static const QStringList s_units_kibi{ "KiB", "MiB", "GiB", "TiB" };
 namespace {
 bool platformUsesSIUnits()
 {
-#ifdef Q_OS_APPLE
-    return true;
-#elif defined(Q_OS_LINUX) || defined(Q_OS_FREEBSD) || defined(Q_OS_OPENBSD)
-    return DesktopServices::desktopEnvironment() == "GNOME";
-#else
     return false;
-#endif
 }
 }  // namespace
 

@@ -79,7 +79,6 @@ MinecraftSettingsWidget::MinecraftSettingsWidget(MinecraftInstance* instance, QW
         m_ui->consoleSettingsBox->setCheckable(true);
         m_ui->windowSizeGroupBox->setCheckable(true);
         m_ui->nativeWorkaroundsGroupBox->setCheckable(true);
-        m_ui->perfomanceGroupBox->setCheckable(true);
         m_ui->gameTimeGroupBox->setCheckable(true);
         m_ui->legacySettingsGroupBox->setCheckable(true);
 
@@ -134,20 +133,6 @@ MinecraftSettingsWidget::MinecraftSettingsWidget(MinecraftInstance* instance, QW
 
     connect(m_ui->maximizedCheckBox, &QCheckBox::toggled, this,
             [this](const bool value) { m_ui->maximizedWarning->setVisible(value && (m_instance == nullptr || !m_instance->isLegacy())); });
-
-#if !defined(Q_OS_LINUX)
-    m_ui->perfomanceGroupBox->hide();
-#endif
-
-    if (!(APPLICATION->capabilities() & Application::SupportsGameMode)) {
-        m_ui->enableFeralGamemodeCheck->setDisabled(true);
-        m_ui->enableFeralGamemodeCheck->setToolTip(tr("Feral Interactive's GameMode could not be found on your system."));
-    }
-
-    if (!(APPLICATION->capabilities() & Application::SupportsMangoHud)) {
-        m_ui->enableMangoHud->setEnabled(false);
-        m_ui->enableMangoHud->setToolTip(tr("MangoHud could not be found on your system."));
-    }
 
     connect(m_ui->useNativeOpenALCheck, &QAbstractButton::toggled, m_ui->lineEditOpenALPath, &QWidget::setEnabled);
     connect(m_ui->useNativeGLFWCheck, &QAbstractButton::toggled, m_ui->lineEditGLFWPath, &QWidget::setEnabled);
@@ -215,32 +200,13 @@ void MinecraftSettingsWidget::loadSettings()
     m_ui->nativeWorkaroundsGroupBox->setChecked(m_instance == nullptr || settings->get("OverrideNativeWorkarounds").toBool());
     m_ui->useNativeGLFWCheck->setChecked(settings->get("UseNativeGLFW").toBool());
     m_ui->lineEditGLFWPath->setText(settings->get("CustomGLFWPath").toString().trimmed());
-#ifdef Q_OS_LINUX
-    m_ui->lineEditGLFWPath->setPlaceholderText(APPLICATION->m_detectedGLFWPath);
-#else
     m_ui->lineEditGLFWPath->setPlaceholderText(tr("Path to %1 library file").arg(BuildConfig.GLFW_LIBRARY_NAME));
-#endif
     m_ui->useNativeOpenALCheck->setChecked(settings->get("UseNativeOpenAL").toBool());
     m_ui->lineEditOpenALPath->setText(settings->get("CustomOpenALPath").toString().trimmed());
-#ifdef Q_OS_LINUX
-    m_ui->lineEditOpenALPath->setPlaceholderText(APPLICATION->m_detectedOpenALPath);
-#else
     m_ui->lineEditOpenALPath->setPlaceholderText(tr("Path to %1 library file").arg(BuildConfig.OPENAL_LIBRARY_NAME));
-#endif
     m_ui->useNativeSDLCheck->setChecked(settings->get("UseNativeSDL").toBool());
     m_ui->lineEditSDLPath->setText(settings->get("CustomSDLPath").toString().trimmed());
-#ifdef Q_OS_LINUX
-    m_ui->lineEditSDLPath->setPlaceholderText(APPLICATION->m_detectedSDLPath);
-#else
     m_ui->lineEditSDLPath->setPlaceholderText(tr("Path to %1 library file").arg(BuildConfig.SDL_LIBRARY_NAME));
-#endif
-
-    // Performance
-    m_ui->perfomanceGroupBox->setChecked(m_instance == nullptr || settings->get("OverridePerformance").toBool());
-    m_ui->enableFeralGamemodeCheck->setChecked(settings->get("EnableFeralGamemode").toBool());
-    m_ui->enableMangoHud->setChecked(settings->get("EnableMangoHud").toBool());
-    m_ui->useDiscreteGpuCheck->setChecked(settings->get("UseDiscreteGpu").toBool());
-    m_ui->useZink->setChecked(settings->get("UseZink").toBool());
 
     if (m_instance != nullptr) {
         // HACK: if we change enable state of child widgets while it's unchecked this creates inconsistency
@@ -432,25 +398,6 @@ void MinecraftSettingsWidget::saveSettings()
         settings->reset("CustomOpenALPath");
         settings->reset("UseNativeSDL");
         settings->reset("CustomSDLPath");
-    }
-
-    // Performance
-    bool performance = m_instance == nullptr || m_ui->perfomanceGroupBox->isChecked();
-
-    if (m_instance != nullptr) {
-        settings->set("OverridePerformance", performance);
-    }
-
-    if (performance) {
-        settings->set("EnableFeralGamemode", m_ui->enableFeralGamemodeCheck->isChecked());
-        settings->set("EnableMangoHud", m_ui->enableMangoHud->isChecked());
-        settings->set("UseDiscreteGpu", m_ui->useDiscreteGpuCheck->isChecked());
-        settings->set("UseZink", m_ui->useZink->isChecked());
-    } else {
-        settings->reset("EnableFeralGamemode");
-        settings->reset("EnableMangoHud");
-        settings->reset("UseDiscreteGpu");
-        settings->reset("UseZink");
     }
 
     // Game time

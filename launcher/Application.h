@@ -105,8 +105,6 @@ class Application : public QApplication {
 
         SupportsMSA = 1U << 0U,
         SupportsFlame = 1U << 1U,
-        SupportsGameMode = 1U << 2U,
-        SupportsMangoHud = 1U << 3U,
     };
     Q_DECLARE_FLAGS(Capabilities, Capability)
 
@@ -205,10 +203,6 @@ class Application : public QApplication {
 
     void oauthReplyRecieved(QVariantMap);
 
-#ifdef Q_OS_MACOS
-    void clickedOnDock();
-#endif
-
    public slots:
     bool launch(MinecraftInstance* instance,
                 LaunchMode mode = LaunchMode::Normal,
@@ -265,10 +259,6 @@ class Application : public QApplication {
     Status m_status = Application::StartingUp;
     Capabilities m_capabilities;
     bool m_portable = false;
-
-#ifdef Q_OS_MACOS
-    Qt::ApplicationState m_prevAppState = Qt::ApplicationInactive;
-#endif
 
     // main state variables
     size_t m_openWindows = 0;

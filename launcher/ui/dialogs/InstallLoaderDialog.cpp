@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-only
+﻿// SPDX-License-Identifier: GPL-3.0-only
 /*
  *  Prism Launcher - Minecraft Launcher
  *  Copyright (C) 2023 TheKodeToad <TheKodeToad@proton.me>
@@ -89,18 +89,12 @@ InstallLoaderDialog::InstallLoaderDialog(PackProfile* profile, const QString& ui
     : QDialog(parent), profile(profile), container(new PageContainer(this, QString(), this)), buttons(new QDialogButtonBox(this))
 {
     auto layout = new QVBoxLayout(this);
-// small margins look ugly on macOS on modal windows
-#ifndef Q_OS_MACOS
     layout->setContentsMargins(0, 0, 0, 0);
-#endif
     container->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
     layout->addWidget(container);
 
     auto buttonLayout = new QHBoxLayout(this);
-// small margins look ugly on macOS on modal windows
-#ifndef Q_OS_MACOS
     buttonLayout->setContentsMargins(0, 0, 6, 6);
-#endif
     auto refreshButton = new QPushButton(tr("&Refresh"), this);
     connect(refreshButton, &QPushButton::clicked, this, [this] { pageCast(container->selectedPage())->loadList(true); });
     buttonLayout->addWidget(refreshButton);

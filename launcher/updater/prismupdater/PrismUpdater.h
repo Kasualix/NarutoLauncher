@@ -83,7 +83,6 @@ class PrismUpdaterApp : public QApplication {
     std::optional<QDir> unpackArchive(const QFileInfo& archive);
 
     QFileInfo downloadAsset(const GitHubReleaseAsset& asset);
-    bool callAppImageUpdate();
 
     void moveAndFinishUpdate(const QDir& target);
 
@@ -101,9 +100,6 @@ class PrismUpdaterApp : public QApplication {
     QString m_rootPath;
     QString m_dataPath;
     bool m_isPortable = false;
-    bool m_isAppimage = false;
-    bool m_isFlatpak = false;
-    QString m_appimagePath;
     QString m_prismExecutable;
     QUrl m_prismRepoUrl;
     Version m_userSelectedVersion;
@@ -136,8 +132,6 @@ class PrismUpdaterApp : public QApplication {
     std::unique_ptr<QFile> logFile;
     bool logToConsole = false;
 
-#if defined Q_OS_WIN32
     // used on Windows to attach the standard IO streams
     bool consoleAttached = false;
-#endif
 };

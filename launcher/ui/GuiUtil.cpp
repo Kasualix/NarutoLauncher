@@ -258,9 +258,5 @@ QStringList GuiUtil::browseForFiles(const QString& context,
 
 QString GuiUtil::trashName()
 {
-#ifdef Q_OS_WIN
     return QObject::tr("Recycle Bin");
-#else
-    return QObject::tr("Trash");
-#endif
 }

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-only
+﻿// SPDX-License-Identifier: GPL-3.0-only
 /*
  *  Prism Launcher - Minecraft Launcher
  *  Copyright (C) 2022 Sefa Eyeoglu <contact@scrumplex.net>
@@ -73,10 +73,7 @@ ResourceDownloadDialog::ResourceDownloadDialog(QWidget* parent,
 
     setWindowIcon(QIcon::fromTheme("new"));
 
-// small margins look ugly on macOS on modal windows
-#ifndef Q_OS_MACOS
     m_buttons.setContentsMargins(0, 0, 6, 6);
-#endif
     // Bonk Qt over its stupid head and make sure it understands which button is the default one...
     // See: https://stackoverflow.com/questions/24556831/qbuttonbox-set-default-button
     auto* okButton = m_buttons.button(QDialogButtonBox::Ok);
@@ -134,10 +131,7 @@ void ResourceDownloadDialog::reject()
 // won't work with subclasses if we put it in this ctor.
 void ResourceDownloadDialog::initializeContainer()
 {
-// small margins look ugly on macOS on modal windows
-#ifndef Q_OS_MACOS
     layout()->setContentsMargins(0, 0, 0, 0);
-#endif
 
     m_container = new PageContainer(this, {}, this);
     m_container->setSizePolicy(QSizePolicy::Policy::Preferred, QSizePolicy::Policy::Expanding);

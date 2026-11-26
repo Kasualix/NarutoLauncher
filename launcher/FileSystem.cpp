@@ -59,7 +59,6 @@
 #include "PSaveFile.h"
 #include "StringUtils.h"
 
-#if defined Q_OS_WIN32
 #include <objidl.h>
 #include <shlguid.h>
 #include <shobjidl.h>
@@ -68,36 +67,14 @@
 #include <windows.h>
 #include <winnls.h>
 #include <string>
-// for ShellExecute
 #include <Shellapi.h>
 #include <objbase.h>
 #include <shlobj.h>
-#else
-#include <utime.h>
-#endif
 
 #include <filesystem>
 namespace fs = std::filesystem;
 
 // clone
-#if defined(Q_OS_LINUX)
-#include <errno.h>
-#include <fcntl.h> /* Definition of FICLONE* constants */
-#include <linux/fs.h>
-#include <sys/ioctl.h>
-#include <unistd.h>
-
-#if defined(WITH_QTDBUS)
-#include <QDBusConnection>
-#include <QDBusReply>
-#include <QDBusUnixFileDescriptor>
-#include <utility>
-#endif
-
-#elif defined(Q_OS_MACOS)
-#include <sys/attr.h>
-#include <sys/clonefile.h>
-#elif defined(Q_OS_WIN)
 // winbtrfs clone vs rundll32 shellbtrfs.dll,ReflinkCopy
 #include <fileapi.h>
 #include <stdio.h>
@@ -107,7 +84,6 @@ namespace fs = std::filesystem;
 #include <winioctl.h>
 #if defined(__MINGW32__)
 #include <crtdbg.h>
-#endif
 #endif
 
 #if defined(Q_OS_WIN)
@@ -219,7 +195,6 @@ bool moveByCopy(const QString& source, const QString& dest)
     return true;
 }
 
-#if defined(Q_OS_WIN) || defined(Q_OS_MACOS)
 QString quoteArgs(const QStringList& args, const QString& wrap, const QString& escapeChar, bool wrapOnlyIfNeeded = false)
 {
     QString result;
@@ -244,28 +219,6 @@ QString quoteArgs(const QStringList& args, const QString& wrap, const QString& e
 
     return result;
 }
-#elif defined(Q_OS_LINUX) || defined(Q_OS_FREEBSD) || defined(Q_OS_OPENBSD)
-QString quoteDesktopExecArg(QString arg)
-{
-    // See https://specifications.freedesktop.org/desktop-entry/latest/exec-variables.html
-    arg.replace(R"(\)", R"(\\\\)");
-    arg.replace(R"($)", R"(\\$)");
-    arg.replace(R"(")", R"(\")");
-    arg.replace(R"(`)", R"(\`)");
-    arg.replace(R"(%)", R"(%%)");
-    return QStringLiteral("\"") + arg + QStringLiteral("\"");
-}
-
-QString quoteDesktopExecArgs(const QStringList& args)
-{
-    QStringList result;
-    result.reserve(args.size());
-    for (auto arg : args) {
-        result.append(quoteDesktopExecArg(arg));
-    }
-    return result.join(' ');
-}
-#endif
 }  // namespace
 namespace FS {
 
@@ -347,13 +300,8 @@ Result<QByteArray> read(const QString& filename)
 
 bool updateTimestamp(const QString& filename)
 {
-#ifdef Q_OS_WIN32
     std::wstring filename_utf_16 = filename.toStdWString();
     return (_wutime64(filename_utf_16.c_str(), nullptr) == 0);
-#else
-    QByteArray filenameBA = QFile::encodeName(filename);
-    return (utime(filenameBA.data(), nullptr) == 0);
-#endif
 }
 
 bool ensureFilePathExists(const QString& filenamepath)
@@ -454,11 +402,7 @@ bool copy::operator()(const QString& offset, bool dryRun)
 
             // Behavior varies on OS, on windows symlink directories seem to get follow/deep copied regardless of copy_opts flags,
             // so skip them now (don't copy them with fs::copy but with privileged FS::create_link later)
-            // On linux symlink directories get correctly copied as symlinks if the flag is set, so only skip non symlink dirs
-            bool skip = fs::is_directory(srcStdPath) && !fs::is_symlink(srcStdPath);
-#ifdef Q_OS_WIN32
-            skip = fs::is_directory(srcStdPath) || fs::is_symlink(srcStdPath);
-#endif
+            bool skip = fs::is_directory(srcStdPath) || fs::is_symlink(srcStdPath);
             if (!skip) {
                 fs::copy(StringUtils::toStdString(srcPath), StringUtils::toStdString(dstPath), opt, err);
             }
@@ -872,40 +816,8 @@ bool deleteContents(const QString& path)
 
 bool trash(const QString& path, QString* pathInTrash)
 {
-#ifdef Q_OS_LINUX
-    if (DesktopServices::isFlatpak()) {
-#if defined(WITH_QTDBUS)
-        const int file = open(path.toUtf8().data(), O_PATH | O_CLOEXEC, 0);
-        if (file == -1) {
-            return false;
-        }
-        const QDBusUnixFileDescriptor fileDescriptor(file);
-        close(file);
-
-        QDBusMessage message = QDBusMessage::createMethodCall("org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop",
-                                                              "org.freedesktop.portal.Trash", "TrashFile");
-
-        message << QVariant::fromValue(fileDescriptor);
-
-        const QDBusReply<uint32_t> reply = QDBusConnection::sessionBus().call(message);
-        if (!reply.isValid()) {
-            qWarning() << "Error while trying to trash the file" << path << reply.error().name() << ":" << reply.error().message();
-            return false;
-        }
-        if (pathInTrash) {
-            *pathInTrash = QString();  // No info provided by the API, use the same semantics as QFile::moveToTrash
-        }
-
-        return reply.value() != 0;
-#else
-        return false;
-#endif
-    }
-#endif
-#if defined Q_OS_WIN32
     if (IsWindowsServer())
         return false;
-#endif
     return QFile::moveToTrash(path, pathInTrash);
 }
 
@@ -1013,16 +925,10 @@ QString NormalizePath(const QString& path)
     return newAbsolute;
 }
 
-#if defined(Q_OS_WIN) || defined(Q_OS_MACOS)
 QString quoteShortcutArgs(const QStringList& args)
 {
-#ifdef Q_OS_WIN
     return quoteArgs(args, "\"", "\\\"", true);
-#elifdef Q_OS_MACOS
-    return quoteArgs(args, "\"", "\\\"");
-#endif
 }
-#endif
 
 namespace {
 const QString g_badChars = "<>:\"|?*\r\n!";
@@ -1102,111 +1008,6 @@ QString createShortcut(QString destination, const QString& target, const QString
         qWarning() << "Destination path can't be created!";
         return QString();
     }
-#if defined(Q_OS_MACOS)
-    QDir application = destination + ".app/";
-
-    if (application.exists()) {
-        qWarning() << "Application already exists!";
-        return QString();
-    }
-
-    if (!application.mkpath(".")) {
-        qWarning() << "Couldn't create application";
-        return QString();
-    }
-
-    QDir content = application.path() + "/Contents/";
-    QDir resources = content.path() + "/Resources/";
-    QDir binaryDir = content.path() + "/MacOS/";
-    QFile info(content.path() + "/Info.plist");
-
-    if (!(content.mkpath(".") && resources.mkpath(".") && binaryDir.mkpath("."))) {
-        qWarning() << "Couldn't create directories within application";
-        return QString();
-    }
-    if (!info.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        qWarning() << "Failed to open file" << info.fileName() << "for writing:" << info.errorString();
-        return QString();
-    }
-
-    QFile(icon).rename(resources.path() + "/Icon.icns");
-
-    // Create the Command file
-    QString exec = binaryDir.path() + "/Run.command";
-
-    QFile f(exec);
-    if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        qWarning() << "Failed to open file" << f.fileName() << "for writing:" << f.errorString();
-        return QString();
-    }
-    QTextStream stream(&f);
-
-    auto argstring = quoteShortcutArgs(args);
-
-    stream << "#!/bin/bash" << "\n";
-    stream << "\"" << target << "\" " << argstring << "\n";
-
-    stream.flush();
-    f.close();
-
-    f.setPermissions(f.permissions() | QFileDevice::ExeOwner | QFileDevice::ExeGroup | QFileDevice::ExeOther);
-
-    // Generate the Info.plist
-    QTextStream infoStream(&info);
-    infoStream << "<?xml version=\"1.0\" encoding=\"UTF-8\"?> \n"
-                  "<!DOCTYPE plist PUBLIC \"-//Apple Computer//DTD PLIST 1.0//EN\" "
-                  "\"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">"
-                  "<plist version=\"1.0\">\n"
-                  "<dict>\n"
-                  "    <key>CFBundleExecutable</key>\n"
-                  "    <string>Run.command</string>\n"  // The path to the executable
-                  "    <key>CFBundleIconFile</key>\n"
-                  "    <string>Icon.icns</string>\n"
-                  "    <key>CFBundleName</key>\n"
-                  "    <string>"
-               << name
-               << "</string>\n"  // Name of the application
-                  "    <key>CFBundlePackageType</key>\n"
-                  "    <string>APPL</string>\n"
-                  "    <key>CFBundleShortVersionString</key>\n"
-                  "    <string>1.0</string>\n"
-                  "    <key>CFBundleVersion</key>\n"
-                  "    <string>1.0</string>\n"
-                  "</dict>\n"
-                  "</plist>";
-
-    return application.path();
-#elif defined(Q_OS_LINUX) || defined(Q_OS_FREEBSD) || defined(Q_OS_OPENBSD)
-    if (!destination.endsWith(".desktop")) {  // in case of isFlatpak destination is already populated
-        destination += ".desktop";
-    }
-    QFile f(destination);
-    if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        qWarning() << "Failed to open file" << f.fileName() << "for writing:" << f.errorString();
-        return QString();
-    }
-    QTextStream stream(&f);
-
-    QStringList execArgs = args;
-    execArgs.prepend(target);
-    auto argstring = quoteDesktopExecArgs(execArgs);
-
-    stream << "[Desktop Entry]" << "\n";
-    stream << "Type=Application" << "\n";
-    stream << "Categories=Game;ActionGame;AdventureGame;Simulation" << "\n";
-    stream << "Exec=" << argstring.toLocal8Bit() << "\n";
-    stream << "Name=" << name.toLocal8Bit() << "\n";
-    if (!icon.isEmpty()) {
-        stream << "Icon=" << icon.toLocal8Bit() << "\n";
-    }
-
-    stream.flush();
-    f.close();
-
-    f.setPermissions(f.permissions() | QFileDevice::ExeOwner | QFileDevice::ExeGroup | QFileDevice::ExeOther);
-
-    return destination;
-#elif defined(Q_OS_WIN)
     QFileInfo targetInfo(target);
 
     if (!targetInfo.exists()) {
@@ -1250,10 +1051,6 @@ QString createShortcut(QString destination, const QString& target, const QString
     }
 
     return destination;
-#else
-    qWarning("Desktop Shortcuts not supported on your platform!");
-    return QString();
-#endif
 }
 
 bool overrideFolder(const QString& overwrittenPath, const QString& overridePath)
@@ -1474,7 +1271,6 @@ bool clone_file(const QString& src, const QString& dst, std::error_code& ec)
         return false;
     }
 
-#if defined(Q_OS_WIN)
 
     if (!win_ioctl_clone(srcPath, dstPath, ec)) {
         qDebug() << "failed win_ioctl_clone";
@@ -1483,32 +1279,8 @@ bool clone_file(const QString& src, const QString& dst, std::error_code& ec)
         return false;
     }
 
-#elif defined(Q_OS_LINUX)
-
-    if (!linux_ficlone(srcPath, dstPath, ec)) {
-        qDebug() << "failed linux_ficlone:";
-        return false;
-    }
-
-#elif defined(Q_OS_MACOS)
-
-    if (!macos_bsd_clonefile(srcPath, dstPath, ec)) {
-        qDebug() << "failed macos_bsd_clonefile:";
-        return false;
-    }
-
-#else
-
-    qWarning() << "clone/reflink not supported! unknown OS";
-    ec = std::make_error_code(std::errc::not_supported);
-    return false;
-
-#endif
-
     return true;
 }
-
-#if defined(Q_OS_WIN)
 
 static long RoundUpToPowerOf2(long originalValue, long roundingMultiplePowerOf2)
 {
@@ -1678,64 +1450,6 @@ bool win_ioctl_clone(const std::wstring& src_path, const std::wstring& dst_path,
     return result;
 }
 
-#elif defined(Q_OS_LINUX)
-
-bool linux_ficlone(const std::string& srcPath, const std::string& dstPath, std::error_code& ec)
-{
-    // https://man7.org/linux/man-pages/man2/ioctl_ficlone.2.html
-
-    int srcFd = open(srcPath.c_str(), O_RDONLY);
-    if (srcFd == -1) {
-        qDebug() << "Failed to open file:" << srcPath.c_str();
-        qDebug() << "Error:" << strerror(errno);
-        ec = std::make_error_code(static_cast<std::errc>(errno));
-        return false;
-    }
-    int dstFd = open(dstPath.c_str(), O_CREAT | O_WRONLY | O_TRUNC, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-    if (dstFd == -1) {
-        qDebug() << "Failed to open file:" << dstPath.c_str();
-        qDebug() << "Error:" << strerror(errno);
-        ec = std::make_error_code(static_cast<std::errc>(errno));
-        close(srcFd);
-        return false;
-    }
-    // attempt to clone
-    if (ioctl(dstFd, FICLONE, srcFd) == -1) {
-        qDebug() << "Failed to clone file:" << srcPath.c_str() << "to" << dstPath.c_str();
-        qDebug() << "Error:" << strerror(errno);
-        ec = std::make_error_code(static_cast<std::errc>(errno));
-        close(srcFd);
-        close(dstFd);
-        return false;
-    }
-    if (close(srcFd)) {
-        qDebug() << "Failed to close file:" << srcPath.c_str();
-        qDebug() << "Error:" << strerror(errno);
-    }
-    if (close(dstFd)) {
-        qDebug() << "Failed to close file:" << dstPath.c_str();
-        qDebug() << "Error:" << strerror(errno);
-    }
-    return true;
-}
-
-#elif defined(Q_OS_MACOS)
-
-bool macos_bsd_clonefile(const std::string& src_path, const std::string& dst_path, std::error_code& ec)
-{
-    // clonefile(const char * src, const char * dst, int flags);
-    // https://www.manpagez.com/man/2/clonefile/
-
-    qDebug() << "attempting file clone via clonefile" << src_path.c_str() << "to" << dst_path.c_str();
-    if (clonefile(src_path.c_str(), dst_path.c_str(), 0) == -1) {
-        qDebug() << "Failed to clone file:" << src_path.c_str() << "to" << dst_path.c_str();
-        qDebug() << "Error:" << strerror(errno);
-        ec = std::make_error_code(static_cast<std::errc>(errno));
-        return false;
-    }
-    return true;
-}
-#endif
 
 /**
  * @brief if the Filesystem is symlink capable
@@ -1774,7 +1488,6 @@ uintmax_t hardLinkCount(const QString& path)
     return count;
 }
 
-#ifdef Q_OS_WIN
 // returns 8.3 file format from long path
 QString shortPathName(const QString& file)
 {
@@ -1812,7 +1525,6 @@ QString getPathNameInLocal8bit(const QString& file)
     }
     return file;
 }
-#endif
 
 QString getUniqueResourceName(const QString& filePath)
 {

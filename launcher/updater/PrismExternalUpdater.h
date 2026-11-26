@@ -25,7 +25,7 @@
 #include "ExternalUpdater.h"
 
 /*!
- * An implementation for the updater on Windows and linux that uses out external updater.
+ * An implementation for the updater on Windows that uses our external updater.
  */
 
 class PrismExternalUpdater : public ExternalUpdater {

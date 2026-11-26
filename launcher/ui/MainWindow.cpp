@@ -238,20 +238,9 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::MainWi
 
         ui->actionCheckUpdate->setVisible(APPLICATION->updaterEnabled());
 
-#ifndef Q_OS_MACOS
-        ui->actionAddToPATH->setVisible(false);
-#endif
-
         // disabled until we have an instance selected
         ui->instanceToolBar->setEnabled(false);
         setInstanceActionsEnabled(false);
-
-        // add a close button at the end of the main toolbar when running on gamescope / steam deck
-        // this is only needed on gamescope because it defaults to an X11/XWayland session and
-        // does not implement decorations
-        if (qgetenv("XDG_CURRENT_DESKTOP") == "gamescope") {
-            ui->mainToolBar->addAction(ui->actionCloseWindow);
-        }
 
         ui->actionViewJavaFolder->setEnabled(BuildConfig.JAVA_DOWNLOADER_ENABLED);
     }
@@ -266,8 +255,6 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::MainWi
 
     updateThemeMenu();
     updateMainToolBar();
-    // OSX magic.
-    setUnifiedTitleAndToolBarOnMac(true);
 
     // Global shortcuts
     {
@@ -433,9 +420,6 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), ui(new Ui::MainWi
     retranslateUi();
 }
 
-// macOS always has a native menu bar, so these fixes are not applicable
-// Other systems may or may not have a native menu bar (most do not - it seems like only Ubuntu Unity does)
-#ifndef Q_OS_MACOS
 void MainWindow::keyReleaseEvent(QKeyEvent* event)
 {
     if (event->key() == Qt::Key_Alt && !APPLICATION->settings()->get("MenuBarInsteadOfToolBar").toBool())
@@ -443,7 +427,6 @@ void MainWindow::keyReleaseEvent(QKeyEvent* event)
     else
         QMainWindow::keyReleaseEvent(event);
 }
-#endif
 
 void MainWindow::retranslateUi()
 {
@@ -1473,29 +1456,6 @@ void MainWindow::on_actionClearMetadata_triggered()
 
     APPLICATION->metacache()->SaveNow();
 }
-
-#ifdef Q_OS_MACOS
-void MainWindow::on_actionAddToPATH_triggered()
-{
-    auto binaryPath = APPLICATION->applicationFilePath();
-    auto targetPath = QString("/usr/local/bin/%1").arg(BuildConfig.LAUNCHER_APP_BINARY_NAME);
-    qDebug() << "Symlinking" << binaryPath << "to" << targetPath;
-
-    QStringList args;
-    args << "-e";
-    args << QString("do shell script \"mkdir -p /usr/local/bin && ln -sf '%1' '%2'\" with administrator privileges")
-                .arg(binaryPath, targetPath);
-    auto outcome = QProcess::execute("/usr/bin/osascript", args);
-    if (!outcome) {
-        QMessageBox::information(this, tr("Successfully added %1 to PATH").arg(BuildConfig.LAUNCHER_DISPLAYNAME),
-                                 tr("%1 was successfully added to your PATH. You can now start it by running `%2`.")
-                                     .arg(BuildConfig.LAUNCHER_DISPLAYNAME, BuildConfig.LAUNCHER_APP_BINARY_NAME));
-    } else {
-        QMessageBox::critical(this, tr("Failed to add %1 to PATH").arg(BuildConfig.LAUNCHER_DISPLAYNAME),
-                              tr("An error occurred while trying to add %1 to PATH").arg(BuildConfig.LAUNCHER_DISPLAYNAME));
-    }
-}
-#endif
 
 void MainWindow::on_actionOpenWiki_triggered()
 {

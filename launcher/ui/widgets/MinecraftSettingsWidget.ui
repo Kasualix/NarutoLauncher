@@ -812,64 +812,6 @@ It is most likely you will need to change the path - please refer to the mod's w
             </widget>
            </item>
            <item>
-            <widget class="QGroupBox" name="perfomanceGroupBox">
-             <property name="enabled">
-              <bool>true</bool>
-             </property>
-             <property name="title">
-              <string>&amp;Performance</string>
-             </property>
-             <property name="checkable">
-              <bool>false</bool>
-             </property>
-             <property name="checked">
-              <bool>false</bool>
-             </property>
-             <layout class="QVBoxLayout" name="verticalLayout_13">
-              <item>
-               <widget class="QCheckBox" name="enableFeralGamemodeCheck">
-                <property name="toolTip">
-                 <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Enable Feral Interactive's GameMode, to potentially improve gaming performance.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                </property>
-                <property name="text">
-                 <string>Enable Feral GameMode</string>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <widget class="QCheckBox" name="enableMangoHud">
-                <property name="toolTip">
-                 <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Enable MangoHud's advanced performance overlay.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                </property>
-                <property name="text">
-                 <string>Enable MangoHud</string>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <widget class="QCheckBox" name="useDiscreteGpuCheck">
-                <property name="toolTip">
-                 <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Use the discrete GPU instead of the primary GPU.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                </property>
-                <property name="text">
-                 <string>Use discrete GPU</string>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <widget class="QCheckBox" name="useZink">
-                <property name="toolTip">
-                 <string>Use Zink, a Mesa OpenGL driver that implements OpenGL on top of Vulkan. Performance may vary depending on the situation. Note: If no suitable Vulkan driver is found, software rendering will be used.</string>
-                </property>
-                <property name="text">
-                 <string>Use Zink</string>
-                </property>
-               </widget>
-              </item>
-             </layout>
-            </widget>
-           </item>
-           <item>
             <spacer name="verticalSpacer">
              <property name="orientation">
               <enum>Qt::Vertical</enum>
@@ -1008,48 +950,9 @@ It is most likely you will need to change the path - please refer to the mod's w
   <tabstop>lineEditOpenALPath</tabstop>
   <tabstop>useNativeSDLCheck</tabstop>
   <tabstop>lineEditSDLPath</tabstop>
-  
-  <tabstop>enableFeralGamemodeCheck</tabstop>
-  <tabstop>enableMangoHud</tabstop>
-  <tabstop>useDiscreteGpuCheck</tabstop>
-  <tabstop>useZink</tabstop>
  </tabstops>
  <resources/>
  <buttongroups>
   <buttongroup name="latestVersionModeGroup"/>
  </buttongroups>
- <connections>
-  <connection>
-   <sender>useDiscreteGpuCheck</sender>
-   <signal>toggled(bool)</signal>
-   <receiver>useZink</receiver>
-   <slot>setDisabled(bool)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>20</x>
-     <y>20</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>20</x>
-     <y>20</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>useZink</sender>
-   <signal>toggled(bool)</signal>
-   <receiver>useDiscreteGpuCheck</receiver>
-   <slot>setDisabled(bool)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>20</x>
-     <y>20</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>20</x>
-     <y>20</y>
-    </hint>
-   </hints>
-  </connection>
- </connections>
 </ui>

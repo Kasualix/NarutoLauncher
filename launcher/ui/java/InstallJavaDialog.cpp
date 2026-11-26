@@ -42,11 +42,6 @@
 #include "ui/widgets/PageContainer.h"
 #include "ui/widgets/VersionSelectWidget.h"
 
-#if defined(Q_OS_MACOS)
-#include "java/download/SymlinkTask.h"
-#include "tasks/SequentialTask.h"
-#endif
-
 namespace {
 class InstallJavaPage : public QWidget, public BasePage {
    public:
@@ -200,18 +195,12 @@ InstallDialog::InstallDialog(const QString& uid, MinecraftInstance* instance, QW
     : QDialog(parent), m_container(new PageContainer(this, QString(), this)), m_buttons(new QDialogButtonBox(this))
 {
     auto* layout = new QVBoxLayout(this);
-// small margins look ugly on macOS on modal windows
-#ifndef Q_OS_MACOS
     layout->setContentsMargins(0, 0, 0, 0);
-#endif
     m_container->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
     layout->addWidget(m_container);
 
     auto* buttonLayout = new QHBoxLayout(this);
-// small margins look ugly on macOS on modal windows
-#ifndef Q_OS_MACOS
     buttonLayout->setContentsMargins(0, 0, 6, 6);
-#endif
 
     auto* refreshLayout = new QHBoxLayout(this);
 
@@ -346,12 +335,6 @@ void InstallDialog::done(int result)
                         deletePath();
                         return;
                 }
-#if defined(Q_OS_MACOS)
-                auto seq = makeShared<SequentialTask>(tr("Install Java"));
-                seq->addTask(task);
-                seq->addTask(makeShared<Java::SymlinkTask>(finalPath));
-                task = seq;
-#endif
                 connect(task.get(), &Task::failed, this, [this, &deletePath](const QString& reason) {
                     QString error = QString("Java download failed: %1").arg(reason);
                     CustomMessageBox::selectable(this, tr("Error"), error, QMessageBox::Warning)->show();

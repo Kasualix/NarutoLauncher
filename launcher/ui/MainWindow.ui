@@ -213,7 +213,6 @@
     <addaction name="actionClearMetadata"/>
     <addaction name="actionReportBug"/>
     <addaction name="actionViewLog"/>
-    <addaction name="actionAddToPATH"/>
     <addaction name="separator"/>
     <addaction name="actionMATRIX"/>
     <addaction name="actionDISCORD"/>
@@ -677,17 +676,6 @@
    </property>
    <property name="toolTip">
     <string>View current and previous launcher logs</string>
-   </property>
-  </action>
-  <action name="actionAddToPATH">
-   <property name="icon">
-    <iconset theme="custom-commands"/>
-   </property>
-   <property name="text">
-    <string>Install to &amp;PATH</string>
-   </property>
-   <property name="toolTip">
-    <string>Install a %1 symlink to /usr/local/bin</string>
    </property>
   </action>
   <action name="actionFoldersButton">

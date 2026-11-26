@@ -40,8 +40,6 @@
 #include <QProgressDialog>
 #include <memory>
 
-#include "DesktopServices.h"
-
 #include "updater/prismupdater/UpdaterDialogs.h"
 
 #include "FileSystem.h"
@@ -112,17 +110,7 @@ PrismUpdaterApp::PrismUpdaterApp(int& argc, char** argv) : QApplication(argc, ar
 
     {  // find data director
        // Root path is used for updates and portable data
-#if defined(Q_OS_LINUX) || defined(Q_OS_FREEBSD) || defined(Q_OS_OPENBSD)
-        QDir foo(FS::PathCombine(binPath, ".."));  // typically portable-root or /usr
-        m_rootPath = foo.absolutePath();
-#elif defined(Q_OS_WIN32)
         m_rootPath = binPath;
-#elif defined(Q_OS_MACOS)
-        QDir foo(FS::PathCombine(binPath, "../.."));
-        m_rootPath = foo.absolutePath();
-        // on macOS, touch the root to force Finder to reload the .app metadata (and fix any icon change issues)
-        FS::updateTimestamp(m_rootPath);
-#endif
     }
 
     QString adjustedBy;
@@ -133,30 +121,25 @@ PrismUpdaterApp::PrismUpdaterApp(int& argc, char** argv) : QApplication(argc, ar
         // on command line
         adjustedBy = "Command line";
         m_dataPath = dirParam;
-#ifndef Q_OS_MACOS
         if (QDir(FS::PathCombine(m_rootPath, "UserData")).exists()) {
             m_isPortable = true;
         }
         if (QFile::exists(FS::PathCombine(m_rootPath, "portable.txt"))) {
             m_isPortable = true;
         }
-#endif
     } else if (auto dataDirEnv =
                    QProcessEnvironment::systemEnvironment().value(QString("%1_DATA_DIR").arg(BuildConfig.LAUNCHER_NAME.toUpper()));
                !dataDirEnv.isEmpty()) {
         adjustedBy = "System environment";
         m_dataPath = dataDirEnv;
-#ifndef Q_OS_MACOS
         if (QFile::exists(FS::PathCombine(m_rootPath, "portable.txt"))) {
             m_isPortable = true;
         }
-#endif
     } else {
         QDir foo(FS::PathCombine(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation), ".."));
         m_dataPath = foo.absolutePath();
         adjustedBy = "Persistent data path";
 
-#ifndef Q_OS_MACOS
         if (auto portableUserData = FS::PathCombine(m_rootPath, "UserData"); QDir(portableUserData).exists()) {
             m_dataPath = portableUserData;
             adjustedBy = "Portable user data path";
@@ -166,7 +149,6 @@ PrismUpdaterApp::PrismUpdaterApp(int& argc, char** argv) : QApplication(argc, ar
             adjustedBy = "Portable data path";
             m_isPortable = true;
         }
-#endif
     }
 
     m_updateLogPath = FS::PathCombine(m_dataPath, "logs", "prism_launcher_update.log");
@@ -284,25 +266,8 @@ PrismUpdaterApp::PrismUpdaterApp(int& argc, char** argv) : QApplication(argc, ar
         m_network->setProxy(proxy);
     }
 
-#ifdef Q_OS_MACOS
-    showFatalErrorMessage(tr("MacOS Not Supported"), tr("The updater does not support installations on MacOS"));
-#endif
-
-    if (binPath.startsWith("/tmp/.mount_")) {
-        m_isAppimage = true;
-        m_appimagePath = QProcessEnvironment::systemEnvironment().value(QStringLiteral("APPIMAGE"));
-        if (m_appimagePath.isEmpty()) {
-            showFatalErrorMessage(tr("Unsupported Installation"),
-                                  tr("Updater is running as misconfigured AppImage? ($APPIMAGE environment variable is missing)"));
-        }
-    }
-
-    m_isFlatpak = DesktopServices::isFlatpak();
-
     QString prismExecutable = FS::PathCombine(binPath, BuildConfig.LAUNCHER_APP_BINARY_NAME);
-#if defined Q_OS_WIN32
     prismExecutable.append(".exe");
-#endif
 
     if (!QFileInfo(prismExecutable).isFile()) {
         showFatalErrorMessage(tr("Unsupported Installation"), tr("The updater can not find the main executable."));
@@ -454,20 +419,6 @@ void PrismUpdaterApp::run()
         return;
     }
 
-    if (m_isFlatpak) {
-        showFatalErrorMessage(tr("Updating flatpack not supported"), tr("Actions outside of checking if an update is available are not "
-                                                                        "supported when running the flatpak version of Prism Launcher."));
-        return;
-    }
-    if (m_isAppimage) {
-        bool result = true;
-        if (needUpdateVal) {
-            result = callAppImageUpdate();
-        }
-        exit(result ? 0 : 1);
-        return;
-    }
-
     if (needUpdateVal || m_forceUpdate || !m_userSelectedVersion.isEmpty()) {
         GitHubRelease updateRelease = latest;
         if (!m_userSelectedVersion.isEmpty()) {
@@ -598,15 +549,11 @@ void PrismUpdaterApp::moveAndFinishUpdate(const QDir& target)
 
     QProcess proc;
     auto appExeName = BuildConfig.LAUNCHER_APP_BINARY_NAME;
-#if defined Q_OS_WIN32
     appExeName.append(".exe");
 
     auto env = QProcessEnvironment::systemEnvironment();
     env.insert("__COMPAT_LAYER", "RUNASINVOKER");
     proc.setProcessEnvironment(env);
-#else
-    appExeName.prepend("bin/");
-#endif
 
     auto appExePath = target.absoluteFilePath(appExeName);
     proc.setProgram(appExePath);
@@ -681,14 +628,6 @@ QList<GitHubReleaseAsset> PrismUpdaterApp::validReleaseArtifacts(const GitHubRel
     for (const auto& asset : release.assets) {
         if (asset.name.endsWith(".zsync")) {
             qDebug() << "Rejecting zsync file" << asset.name;
-            continue;
-        }
-        if (!m_isAppimage && asset.name.toLower().endsWith("appimage")) {
-            qDebug() << "Rejecting" << asset.name << "because it is an AppImage";
-            continue;
-        }
-        if (m_isAppimage && !asset.name.toLower().endsWith("appimage")) {
-            qDebug() << "Rejecting" << asset.name << "because it is not an AppImage";
             continue;
         }
         auto assetName = asset.name.toLower();
@@ -801,20 +740,6 @@ QFileInfo PrismUpdaterApp::downloadAsset(const GitHubReleaseAsset& asset)
 
     QFileInfo outFile(outFilePath);
     return outFile;
-}
-
-bool PrismUpdaterApp::callAppImageUpdate()
-{
-    auto appimagePath = QProcessEnvironment::systemEnvironment().value(QStringLiteral("APPIMAGE"));
-    QProcess proc = QProcess();
-    qDebug() << "Calling: AppImageUpdate" << appimagePath;
-    proc.setProgram(FS::PathCombine(m_rootPath, "bin", "AppImageUpdate.AppImage"));
-    proc.setArguments({ appimagePath });
-    auto result = proc.startDetached();
-    if (!result) {
-        qDebug() << "Failed to start AppImageUpdate reason:" << proc.errorString();
-    }
-    return result;
 }
 
 void PrismUpdaterApp::clearUpdateLog()
@@ -977,15 +902,11 @@ void PrismUpdaterApp::unpackAndInstall(const QFileInfo& archive)
         QProcess proc = QProcess();
 
         auto exeName = QStringLiteral("%1_updater").arg(BuildConfig.LAUNCHER_APP_BINARY_NAME);
-#if defined Q_OS_WIN32
         exeName.append(".exe");
 
         auto env = QProcessEnvironment::systemEnvironment();
         env.insert("__COMPAT_LAYER", "RUNASINVOKER");
         proc.setProcessEnvironment(env);
-#else
-        exeName.prepend("bin/");
-#endif
 
         auto newUpdaterPath = loc.value().absoluteFilePath(exeName);
         logUpdate(tr("Starting new updater at '%1'").arg(newUpdaterPath));
@@ -1027,24 +948,20 @@ void PrismUpdaterApp::backupAppDir()
 
     if (fileList.isEmpty()) {
         // best guess
-        if (BuildConfig.BUILD_ARTIFACT.toLower().contains("linux")) {
-            fileList.append({ BuildConfig.LAUNCHER_NAME, "bin", "share", "lib" });
-        } else {  // windows by process of elimination
-            fileList.append({
-                "jars",
-                QString("%1.exe").arg(BuildConfig.LAUNCHER_APP_BINARY_NAME),
-                QString("%1_filelink.exe").arg(BuildConfig.LAUNCHER_APP_BINARY_NAME),
-                QString("%1_updater.exe").arg(BuildConfig.LAUNCHER_APP_BINARY_NAME),
-                "qtlogging.ini",
-                "imageformats",
-                "iconengines",
-                "platforms",
-                "styles",
-                "tls",
-                "qt.conf",
-                "Qt*.dll",
-            });
-        }
+        fileList.append({
+            "jars",
+            QString("%1.exe").arg(BuildConfig.LAUNCHER_APP_BINARY_NAME),
+            QString("%1_filelink.exe").arg(BuildConfig.LAUNCHER_APP_BINARY_NAME),
+            QString("%1_updater.exe").arg(BuildConfig.LAUNCHER_APP_BINARY_NAME),
+            "qtlogging.ini",
+            "imageformats",
+            "iconengines",
+            "platforms",
+            "styles",
+            "tls",
+            "qt.conf",
+            "Qt*.dll",
+        });
         logUpdate("manifest.txt empty or missing. making best guess at files to back up.");
     }
     logUpdate(tr("Backing up:\n  %1").arg(fileList.join(",\n  ")));

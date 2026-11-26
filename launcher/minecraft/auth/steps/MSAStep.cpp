@@ -45,28 +45,16 @@
 #include "BuildConfig.h"
 #include "FileSystem.h"
 
-#include <QProcess>
 #include <QSettings>
 #include <QStandardPaths>
 
 bool isSchemeHandlerRegistered()
 {
-#ifdef Q_OS_LINUX
-    QProcess process;
-    process.start("xdg-mime", { "query", "default", "x-scheme-handler/" + BuildConfig.LAUNCHER_URLSCHEME });
-    process.waitForFinished();
-    QString output = process.readAllStandardOutput().trimmed();
-
-    return output.contains(APPLICATION->desktopFileName());
-
-#elif defined(Q_OS_WIN)
     QString regPath = QString("HKEY_CURRENT_USER\\Software\\Classes\\%1").arg(BuildConfig.LAUNCHER_URLSCHEME);
     QSettings settings(regPath, QSettings::NativeFormat);
 
     const QString registeredRunCommand = settings.value("shell/open/command/.").toString().replace("\\", "/");
     return registeredRunCommand.contains(QCoreApplication::applicationFilePath());
-#endif
-    return true;
 }
 
 class CustomOAuthOobReplyHandler : public QOAuthOobReplyHandler {
@@ -114,7 +102,7 @@ class LoggingOAuthHttpServerReplyHandler final : public QOAuthHttpServerReplyHan
 MSAStep::MSAStep(AccountData* data, bool silent) : AuthStep(data), m_silent(silent)
 {
     m_clientId = APPLICATION->getMSAClientID();
-    if (QCoreApplication::applicationFilePath().startsWith("/tmp/.mount_") || APPLICATION->isPortable() || !isSchemeHandlerRegistered())
+    if (APPLICATION->isPortable() || !isSchemeHandlerRegistered())
 
     {
         auto replyHandler = new LoggingOAuthHttpServerReplyHandler(this);

@@ -48,16 +48,10 @@
 #include <QTime>
 #include "LockedFile.h"
 
-#if defined(Q_OS_WIN)
 #include <qt_windows.h>
 #include <QLibrary>
 typedef BOOL(WINAPI* PProcessIdToSessionId)(DWORD, DWORD*);
 static PProcessIdToSessionId pProcessIdToSessionId = 0;
-#endif
-#if defined(Q_OS_UNIX)
-#include <sys/types.h>
-#include <unistd.h>
-#endif
 
 #include <QCryptographicHash>
 #include <chrono>
@@ -68,9 +62,7 @@ static const char* ack = "ack";
 ApplicationId ApplicationId::fromTraditionalApp()
 {
     QString protoId = QCoreApplication::applicationFilePath();
-#if defined(Q_OS_WIN)
     protoId = protoId.toLower();
-#endif
     auto prefix = protoId.section(QLatin1Char('/'), -1);
     static const QRegularExpression s_removeChars("[^a-zA-Z]");
     prefix.remove(s_removeChars);
@@ -78,7 +70,6 @@ ApplicationId ApplicationId::fromTraditionalApp()
     QByteArray idc = protoId.toUtf8();
     quint16 idNum = qChecksum(idc);
     auto socketName = QLatin1String("pl") + prefix + QLatin1Char('-') + QString::number(idNum, 16).left(12);
-#if defined(Q_OS_WIN)
     if (!pProcessIdToSessionId) {
         QLibrary lib("kernel32");
         pProcessIdToSessionId = (PProcessIdToSessionId)lib.resolve("ProcessIdToSessionId");
@@ -88,9 +79,6 @@ ApplicationId ApplicationId::fromTraditionalApp()
         pProcessIdToSessionId(GetCurrentProcessId(), &sessionId);
         socketName += QLatin1Char('-') + QString::number(sessionId, 16);
     }
-#else
-    socketName += QLatin1Char('-') + QString::number(::getuid(), 16);
-#endif
     return ApplicationId(socketName);
 }
 
@@ -137,13 +125,6 @@ bool LocalPeer::isClient()
         return true;
 
     bool res = server->listen(socketName);
-#if defined(Q_OS_UNIX)
-    // ### Workaround
-    if (!res && server->serverError() == QAbstractSocket::AddressInUseError) {
-        QLocalServer::removeServer(socketName);
-        res = server->listen(socketName);
-    }
-#endif
     if (!res)
         qWarning("QtSingleCoreApplication: listen on local socket failed, %s", qPrintable(server->errorString()));
     connect(server.get(), &QLocalServer::newConnection, this, &LocalPeer::receiveConnection);

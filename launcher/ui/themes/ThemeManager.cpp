@@ -150,11 +150,9 @@ void ThemeManager::initializeWidgets()
     themeDebugLog() << "<> Initializing System Widget Themes";
     QStringList styles = QStyleFactory::keys();
     for (auto& st : styles) {
-#ifdef Q_OS_WINDOWS
         if (QSysInfo::productVersion() != "11" && st == "windows11") {
             continue;
         }
-#endif
         themeDebugLog() << "Loading System Theme:" << addTheme(std::make_unique<SystemTheme>(st, m_defaultPalette, false));
     }
 
@@ -190,11 +188,9 @@ void ThemeManager::initializeWidgets()
     themeDebugLog() << "<> Widget themes initialized.";
 }
 
-#ifndef Q_OS_MACOS
 void ThemeManager::setTitlebarColorOnMac(WId windowId, const QColor& color) {}
 void ThemeManager::setTitlebarColorOfAllWindowsOnMac(const QColor& color) {}
 void ThemeManager::stopSettingNewWindowColorsOnMac() {}
-#endif
 
 QList<IconTheme*> ThemeManager::getValidIconThemes()
 {

@@ -54,7 +54,7 @@ class Config {
     QString LAUNCHER_GIT;
     QString LAUNCHER_APPID;
     QString LAUNCHER_URLSCHEME;
-    QString LAUNCHER_SVGFILENAME;
+    QString LAUNCHER_ICONFILENAME;
     QString LAUNCHER_ENVNAME;
 
     /// The major version number.
@@ -99,12 +99,6 @@ class Config {
 
     /// URL for the updater's channel
     QString UPDATER_GITHUB_REPO;
-
-    /// The public key used to sign releases for the Sparkle updater appcast
-    QString MAC_SPARKLE_PUB_KEY;
-
-    /// URL for the Sparkle updater's appcast
-    QString MAC_SPARKLE_APPCAST_URL;
 
     /// User-Agent to use.
     QString USER_AGENT;

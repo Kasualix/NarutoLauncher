@@ -1,9 +1,6 @@
 cmake_minimum_required(VERSION 3.25) # Required for features like `CMAKE_MSVC_DEBUG_INFORMATION_FORMAT`
 
 project(Launcher LANGUAGES C CXX)
-if(APPLE)
-    enable_language(OBJC OBJCXX)
-endif()
 
 string(COMPARE EQUAL "${CMAKE_SOURCE_DIR}" "${CMAKE_BUILD_DIR}" IS_IN_SOURCE_BUILD)
 if(IS_IN_SOURCE_BUILD)
@@ -23,9 +20,6 @@ set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/")
 
 # Output all executables and shared libs in the main build folder, not in subfolders.
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
-if(UNIX)
-    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
-endif()
 set(CMAKE_JAVA_TARGET_OUTPUT_DIR ${PROJECT_BINARY_DIR}/jars)
 
 ######## Set compiler flags ########
@@ -235,32 +229,12 @@ if(Launcher_WARNING_AS_ERROR)
 endif()
 
 # Java downloader
-set(Launcher_ENABLE_JAVA_DOWNLOADER_DEFAULT ON)
-
-# Although we recommend enabling this, we cannot guarantee binary compatibility on
-# differing Linux/BSD/etc distributions. Downstream packagers should be explicitly opt-ing into this
-# feature if they know it will work with their distribution.
-if(UNIX AND NOT APPLE)
-    set(Launcher_ENABLE_JAVA_DOWNLOADER_DEFAULT OFF)
-endif()
-
-# Java downloader
-option(Launcher_ENABLE_JAVA_DOWNLOADER "Build the java downloader feature" ${Launcher_ENABLE_JAVA_DOWNLOADER_DEFAULT})
+option(Launcher_ENABLE_JAVA_DOWNLOADER "Build the java downloader feature" ON)
 
 # Native libraries
-if(UNIX AND APPLE)
-    set(Launcher_GLFW_LIBRARY_NAME "libglfw.dylib" CACHE STRING "Name of native glfw library")
-    set(Launcher_OPENAL_LIBRARY_NAME "libopenal.dylib" CACHE STRING "Name of native openal library")
-    set(Launcher_SDL_LIBRARY_NAME "libSDL3.dylib" CACHE STRING "Name of native sdl library")
-elseif(UNIX)
-    set(Launcher_GLFW_LIBRARY_NAME "libglfw.so" CACHE STRING "Name of native glfw library")
-    set(Launcher_OPENAL_LIBRARY_NAME "libopenal.so" CACHE STRING "Name of native openal library")
-    set(Launcher_SDL_LIBRARY_NAME "libSDL3.so" CACHE STRING "Name of native sdl library")
-elseif(WIN32)
-    set(Launcher_GLFW_LIBRARY_NAME "glfw.dll" CACHE STRING "Name of native glfw library")
-    set(Launcher_OPENAL_LIBRARY_NAME "OpenAL.dll" CACHE STRING "Name of native openal library")
-    set(Launcher_SDL_LIBRARY_NAME "SDL3.dll" CACHE STRING "Name of native sdl library")
-endif()
+set(Launcher_GLFW_LIBRARY_NAME "glfw.dll" CACHE STRING "Name of native glfw library")
+set(Launcher_OPENAL_LIBRARY_NAME "OpenAL.dll" CACHE STRING "Name of native openal library")
+set(Launcher_SDL_LIBRARY_NAME "SDL3.dll" CACHE STRING "Name of native sdl library")
 
 # API Keys
 # NOTE: These API keys are here for convenience. If you rebrand this software or intend to break the terms of service
@@ -317,11 +291,8 @@ if(Launcher_QT_VERSION_MAJOR EQUAL 6)
             Xml
         HINTS
             C:/Qt/*/*/lib/cmake
-            /opt/qt/*/*/lib/cmake
             $ENV{MINGW_PREFIX}/opt/qt/*/*/lib/cmake
     )
-    find_package(Qt6 COMPONENTS DBus HINTS /opt/qt/*/*/lib/cmake)
-    list(APPEND Launcher_QT_DBUS Qt6::DBus)
 else()
     message(FATAL_ERROR "Qt version ${Launcher_QT_VERSION_MAJOR} is not supported")
 endif()
@@ -334,32 +305,10 @@ endif()
 
 find_package(cmark REQUIRED)
 
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(gamemode IMPORTED_TARGET gamemode)
-
-    option(Launcher_ENABLE_GAMEMODE "Enable Feral GameMode support" ${gamemode_FOUND})
-
-    if(Launcher_ENABLE_GAMEMODE AND NOT gamemode_FOUND)
-        message(FATAL_ERROR "Launcher_ENABLE_GAMEMODE is enabled, but Feral GameMode was not found")
-    endif()
-
-    if(Launcher_ENABLE_GAMEMODE)
-        message(STATUS "Feral GameMode support enabled")
-    else()
-        message(STATUS "Feral GameMode support disabled")
-    endif()
-endif()
-
 # Find libqrencode
 ## NOTE(@getchoo): Never use pkg-config with MSVC since the vcpkg port makes our install bundle fail to find the dll
-if(MSVC)
-    find_path(LIBQRENCODE_INCLUDE_DIR qrencode.h REQUIRED)
-    find_library(LIBQRENCODE_LIBRARY qrencode REQUIRED)
-else()
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(libqrencode REQUIRED IMPORTED_TARGET libqrencode)
-endif()
+find_path(LIBQRENCODE_INCLUDE_DIR qrencode.h REQUIRED)
+find_library(LIBQRENCODE_LIBRARY qrencode REQUIRED)
 
 # Find libarchive through CMake packages, mainly for vcpkg
 find_package(LibArchive)
@@ -388,136 +337,19 @@ add_subdirectory(program_info)
 
 ####################################### Install layout #######################################
 
-set(Launcher_ENABLE_UPDATER NO)
 set(Launcher_BUILD_UPDATER NO)
-
-if (NOT APPLE AND (NOT Launcher_UPDATER_GITHUB_REPO STREQUAL "" AND NOT Launcher_BUILD_ARTIFACT STREQUAL ""))
+if(NOT Launcher_UPDATER_GITHUB_REPO STREQUAL "" AND NOT Launcher_BUILD_ARTIFACT STREQUAL "")
     set(Launcher_BUILD_UPDATER YES)
 endif()
 
-if(NOT (UNIX AND APPLE))
-    # Install "portable.txt" if selected component is "portable"
-    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/${Launcher_Portable_File}" DESTINATION "." COMPONENT portable EXCLUDE_FROM_ALL)
-endif()
+# Install "portable.txt" if selected component is "portable"
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/${Launcher_Portable_File}" DESTINATION "." COMPONENT portable EXCLUDE_FROM_ALL)
 
-if(UNIX AND APPLE)
-    set(BINARY_DEST_DIR "${Launcher_Name}.app/Contents/MacOS")
-    set(LIBRARY_DEST_DIR "${Launcher_Name}.app/Contents/MacOS")
-    set(PLUGIN_DEST_DIR "${Launcher_Name}.app/Contents/MacOS")
-    set(FRAMEWORK_DEST_DIR "${Launcher_Name}.app/Contents/Frameworks")
-    set(RESOURCES_DEST_DIR "${Launcher_Name}.app/Contents/Resources")
-    set(JARS_DEST_DIR "${Launcher_Name}.app/Contents/MacOS/jars")
-
-    # Mac bundle settings
-    set(MACOSX_BUNDLE_BUNDLE_NAME "${Launcher_DisplayName}")
-    set(MACOSX_BUNDLE_INFO_STRING "${Launcher_DisplayName}: A custom launcher for Minecraft that allows you to easily manage multiple installations of Minecraft at once.")
-    set(MACOSX_BUNDLE_GUI_IDENTIFIER "${Launcher_AppID}")
-    set(MACOSX_BUNDLE_BUNDLE_VERSION "${Launcher_VERSION_NAME}")
-    set(MACOSX_BUNDLE_SHORT_VERSION_STRING "${Launcher_VERSION_NAME}")
-    set(MACOSX_BUNDLE_LONG_VERSION_STRING "${Launcher_VERSION_NAME}")
-    set(MACOSX_BUNDLE_ICON_FILE ${Launcher_Name}.icns)
-    set(MACOSX_BUNDLE_COPYRIGHT "${Launcher_Copyright_Mac}")
-    set(MACOSX_SPARKLE_UPDATE_PUBLIC_KEY "v55ZWWD6QlPoXGV6VLzOTZxZUggWeE51X8cRQyQh6vA=" CACHE STRING "Public key for Sparkle update feed")
-    set(MACOSX_SPARKLE_UPDATE_FEED_URL "https://prismlauncher.org/feed/appcast.xml" CACHE STRING "URL for Sparkle update feed")
-
-    set(MACOSX_SPARKLE_DOWNLOAD_URL "https://github.com/sparkle-project/Sparkle/releases/download/2.9.6/Sparkle-2.9.6.tar.xz" CACHE STRING "URL to Sparkle release archive")
-    set(MACOSX_SPARKLE_SHA256 "52bf9e88cdd972fc0c81501377a880e90d47031bd8ca5462488f843e2609e192" CACHE STRING "SHA256 checksum for Sparkle release archive")
-    set(MACOSX_SPARKLE_DIR "${CMAKE_BINARY_DIR}/frameworks/Sparkle")
-
-    if(NOT MACOSX_SPARKLE_UPDATE_PUBLIC_KEY STREQUAL "" AND NOT MACOSX_SPARKLE_UPDATE_FEED_URL STREQUAL "")
-        set(Launcher_ENABLE_UPDATER YES)
-    endif()
-
-    # Add the icon
-    install(FILES ${Launcher_Branding_ICNS} DESTINATION ${RESOURCES_DEST_DIR} RENAME ${Launcher_Name}.icns)
-
-    find_program(ACTOOL_EXE actool DOC "Path to the apple asset catalog compiler")
-    if(ACTOOL_EXE)
-        execute_process(
-            COMMAND xcodebuild -version
-            OUTPUT_VARIABLE XCODE_VERSION_OUTPUT
-            OUTPUT_STRIP_TRAILING_WHITESPACE
-        )
-
-        string(REGEX MATCH "Xcode ([0-9]+\.[0-9]+)" XCODE_VERSION_MATCH "${XCODE_VERSION_OUTPUT}")
-        if(XCODE_VERSION_MATCH)
-            set(XCODE_VERSION ${CMAKE_MATCH_1})
-        else()
-            set(XCODE_VERSION 0.0)
-        endif()
-
-        if(XCODE_VERSION VERSION_GREATER_EQUAL 26.0)
-            set(ASSETS_OUT_DIR "${CMAKE_BINARY_DIR}/program_info")
-            set(GENERATED_ASSETS_CAR "${ASSETS_OUT_DIR}/Assets.car")
-            set(ICON_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/${Launcher_Branding_MAC_ICON}")
-
-            add_custom_command(
-                OUTPUT "${GENERATED_ASSETS_CAR}"
-                COMMAND ${ACTOOL_EXE} "${ICON_SOURCE}"
-                        --compile "${ASSETS_OUT_DIR}"
-                        --output-partial-info-plist /dev/null
-                        --app-icon ${Launcher_Name}
-                        --enable-on-demand-resources NO
-                        --target-device mac
-                        --minimum-deployment-target ${CMAKE_OSX_DEPLOYMENT_TARGET}
-                        --platform macosx
-                DEPENDS "${ICON_SOURCE}"
-                COMMENT "Compiling asset catalog (${ICON_SOURCE})"
-                VERBATIM
-            )
-            add_custom_target(compile_assets ALL DEPENDS "${GENERATED_ASSETS_CAR}")
-            install(FILES "${GENERATED_ASSETS_CAR}" DESTINATION "${RESOURCES_DEST_DIR}")
-        else()
-            message(WARNING "Xcode ${XCODE_VERSION} is too old. Minimum required version is 26.0. Not compiling liquid glass icons.")
-        endif()
-
-    else()
-        message(WARNING "actool not found. Cannot compile macOS app icons.\n"
-                "Install Xcode command line tools: 'xcode-select --install'")
-    endif()
-
-
-elseif(UNIX)
-    include(KDEInstallDirs)
-
-    set(BINARY_DEST_DIR "bin")
-    set(LIBRARY_DEST_DIR "lib${LIB_SUFFIX}")
-    set(JARS_DEST_DIR "share/${Launcher_Name}")
-
-    # Set RPATH
-    SET(Launcher_BINARY_RPATH "$ORIGIN/")
-
-    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${Launcher_Desktop} DESTINATION ${KDE_INSTALL_APPDIR})
-    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${Launcher_MetaInfo} DESTINATION ${KDE_INSTALL_METAINFODIR})
-    install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/${Launcher_SVG} DESTINATION "${KDE_INSTALL_ICONDIR}/hicolor/scalable/apps")
-    install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/${Launcher_PNG_256} DESTINATION "${KDE_INSTALL_ICONDIR}/hicolor/256x256/apps" RENAME "${Launcher_AppID}.png")
-    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${Launcher_MIMEInfo} DESTINATION ${KDE_INSTALL_MIMEDIR})
-
-    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/launcher/qtlogging.ini" DESTINATION "share/${Launcher_Name}")
-
-    set(PLUGIN_DEST_DIR "plugins")
-    set(BUNDLE_DEST_DIR ".")
-    set(RESOURCES_DEST_DIR ".")
-
-    if(Launcher_ManPage)
-        install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${Launcher_ManPage} DESTINATION "${KDE_INSTALL_MANDIR}/man6")
-    endif()
-
-    # Install basic runner script if component "portable" is selected
-    configure_file(launcher/Launcher.in "${CMAKE_CURRENT_BINARY_DIR}/LauncherScript" @ONLY)
-    install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/LauncherScript" DESTINATION "." RENAME ${Launcher_Name} COMPONENT portable EXCLUDE_FROM_ALL)
-
-elseif(WIN32)
-    set(BINARY_DEST_DIR ".")
-    set(LIBRARY_DEST_DIR ".")
-    set(PLUGIN_DEST_DIR ".")
-    set(RESOURCES_DEST_DIR ".")
-    set(JARS_DEST_DIR "jars")
-else()
-    message(FATAL_ERROR "Platform not supported")
-endif()
-
-
+set(BINARY_DEST_DIR ".")
+set(LIBRARY_DEST_DIR ".")
+set(PLUGIN_DEST_DIR ".")
+set(RESOURCES_DEST_DIR ".")
+set(JARS_DEST_DIR "jars")
 
 ################################ Included Libs ################################
 

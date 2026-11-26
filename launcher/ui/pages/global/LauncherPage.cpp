@@ -48,7 +48,6 @@
 #include <FileSystem.h>
 #include "Application.h"
 #include "BuildConfig.h"
-#include "DesktopServices.h"
 #include "Json.h"
 #include "settings/SettingsObject.h"
 #include "ui/themes/ITheme.h"
@@ -104,19 +103,6 @@ bool LauncherPage::confirmInstanceDirPath(const QString& rawDir, const QString& 
         warning.setInformativeText(
             tr("Do you really want to use this path? "
                "Selecting \"No\" will close this and not alter your instance path."));
-        warning.setStandardButtons(QMessageBox::Ok | QMessageBox::Cancel);
-        if (warning.exec() != QMessageBox::Ok)
-            return false;
-    } else if (DesktopServices::isFlatpak() && rawDir.startsWith("/run/user")) {
-        QMessageBox warning;
-        warning.setText(tr("You're trying to specify an instance folder "
-                           "which was granted temporarily via Flatpak.\n"
-                           "This is known to cause problems. "
-                           "After a restart the launcher might break, "
-                           "because it will no longer have access to that directory.\n\n"
-                           "Granting %1 access to it via Flatseal is recommended.")
-                            .arg(BuildConfig.LAUNCHER_DISPLAYNAME));
-        warning.setInformativeText(tr("Do you want to proceed anyway?"));
         warning.setStandardButtons(QMessageBox::Ok | QMessageBox::Cancel);
         if (warning.exec() != QMessageBox::Ok)
             return false;

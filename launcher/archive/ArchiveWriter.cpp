@@ -111,7 +111,6 @@ Result<> ArchiveWriter::addFile(const QString& fileName, const QString& fileDest
     auto fileDestUtf8 = fileDest.toUtf8();
     archive_entry_set_pathname_utf8(entry, fileDestUtf8.constData());
 
-#if defined Q_OS_WIN32
     {
         // Windows needs to use this method, thanks I hate it.
 
@@ -132,23 +131,6 @@ Result<> ArchiveWriter::addFile(const QString& fileName, const QString& fileDest
         archive_entry_copy_bhfi(entry, &file_info);
         CloseHandle(file_handle);
     }
-#else
-    {
-        // this only works for multibyte encoded filenames if the local is properly set,
-        // a wide character version doesn't seem to exist: here's hoping...
-
-        QByteArray utf8 = fileInfo.absoluteFilePath().toUtf8();
-        const char* cpath = utf8.constData();
-        struct stat st;
-        if (stat(cpath, &st) != 0) {
-            const auto err = std::error_code(errno, std::system_category());
-            return std::unexpected{ QString("Failed to stat file: %1").arg(StringUtils::fromStdString(err.message())) };
-        }
-
-        // This should handle the copying of most attributes
-        archive_entry_copy_stat(entry, &st);
-    }
-#endif
 
     // However:
     // "The [filetype] constants used by stat(2) may have different numeric values from the corresponding [libarchive constants]."

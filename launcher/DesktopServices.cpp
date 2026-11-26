@@ -67,32 +67,6 @@ bool openUrl(const QUrl& url)
     return QDesktopServices::openUrl(url);
 }
 
-bool isFlatpak()
-{
-#ifdef Q_OS_LINUX
-    return QFile::exists("/.flatpak-info");
-#else
-    return false;
-#endif
-}
-
-bool isSnap()
-{
-#ifdef Q_OS_LINUX
-    return getenv("SNAP");
-#else
-    return false;
-#endif
-}
-
-#if defined(Q_OS_LINUX) || defined(Q_OS_FREEBSD) || defined(Q_OS_OPENBSD)
-QString desktopEnvironment()
-{
-    return qEnvironmentVariable("XDG_CURRENT_DESKTOP");
-}
-#endif
-
-#ifdef Q_OS_WIN
 Result<winrt::com_ptr<IShellLink>> createShellLink(const QString& path,
                                                    const QStringList& arguments,
                                                    const QString& workDir,
@@ -113,5 +87,4 @@ Result<winrt::com_ptr<IShellLink>> createShellLink(const QString& path,
 
     return shellLink;
 }
-#endif
 }  // namespace DesktopServices

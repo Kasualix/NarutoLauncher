@@ -137,10 +137,6 @@ class MainWindow : public QMainWindow {
 
     void on_actionClearMetadata_triggered();
 
-#ifdef Q_OS_MACOS
-    void on_actionAddToPATH_triggered();
-#endif
-
     void on_actionOpenWiki_triggered();
 
     void on_actionMoreNews_triggered();
@@ -214,9 +210,7 @@ class MainWindow : public QMainWindow {
 
     void lockToolbars(bool);
 
-#ifndef Q_OS_MACOS
     void keyReleaseEvent(QKeyEvent* event) override;
-#endif
 
     void refreshCurrentInstance();
 
